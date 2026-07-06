@@ -1,0 +1,57 @@
+{
+  "rules": {
+    "tuktukSales": {
+      "users": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && (auth.uid === $uid || root.child('tuktukSales/users/' + auth.uid + '/role').val() === 'Admin')"
+        },
+        ".read": "auth != null"
+      },
+      "customers": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "inquiries": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "vehicles": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "sales": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "payments": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "creditApplications": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "workshopJobs": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "ntsaProcesses": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "dispatchOrders": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "notifications": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "reports": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

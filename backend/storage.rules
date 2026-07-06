@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Tuk-Tuk Sales: vehicle images (1-4 per vehicle)
+    match /tuktukSales/vehicles/{vehicleId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    // Tuk-Tuk Sales: credit application documents
+    match /tuktukSales/credit/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+             || request.resource.contentType.matches('application/pdf'));
+    }
+    // Tuk-Tuk Sales: customer documents
+    match /tuktukSales/customers/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+             || request.resource.contentType.matches('application/pdf'));
+    }
+  }
+}

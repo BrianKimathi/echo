@@ -1,0 +1,841 @@
+Prompt
+
+You are a senior Full Stack Software Architect and Engineer.
+
+Your task is to build an MVP for a Tuk-Tuk Sales Management System for an e-mobility company.
+
+The objective is NOT to build a production-ready ERP. Instead, create an MVP that digitizes the company's sales workflow from customer inquiry to vehicle handover.
+
+The application should have a modern, clean, responsive UI that looks professional and enterprise-grade.
+
+Technology Stack
+
+Frontend
+
+React 19
+Vite
+React Router
+Firebase SDK
+TailwindCSS
+React Hook Form
+React Icons
+Framer Motion
+React Hot Toast
+Recharts
+Day.js
+
+Backend
+
+Firebase Realtime Database
+Firebase Authentication
+Firebase Storage
+
+Deployment
+
+Firebase Hosting
+
+State Management
+
+React Context API
+
+Do NOT use Redux.
+
+Authentication
+
+Use Firebase Authentication.
+
+Supported login:
+
+Email
+Password
+
+Only administrators can create new users.
+
+Each user has:
+
+uid
+name
+email
+phone
+role
+department
+createdAt
+active
+
+Roles
+
+Admin
+
+Sales Agent
+
+Finance Officer
+
+Workshop Officer
+
+NTSA Officer
+
+Dispatch Officer
+
+Implement role-based route protection.
+
+Application Layout
+
+Desktop layout
+
+-----------------------------------------
+Sidebar
+
+Dashboard
+
+Customers
+
+Inquiries
+
+Sales
+
+Inventory
+
+Workshop
+
+NTSA
+
+Dispatch
+
+Reports
+
+Users
+
+-----------------------------------------
+Top Navbar
+
+Current User
+
+Notifications
+
+Search
+
+Logout
+-----------------------------------------
+
+Main Content
+
+Sidebar should collapse.
+
+Responsive for tablets.
+
+Theme
+
+Modern SaaS dashboard.
+
+Colors
+
+Primary
+
+#0B6E4F
+
+Secondary
+
+#1C9A6D
+
+Accent
+
+#F4B400
+
+Background
+
+#F7F9FB
+
+Cards should have rounded corners.
+
+Soft shadows.
+
+Smooth animations.
+
+Professional spacing.
+
+Firebase Realtime Database Structure
+users
+
+    uid
+
+customers
+
+    customerId
+
+inquiries
+
+    inquiryId
+
+vehicles
+
+    vehicleId
+
+sales
+
+    saleId
+
+payments
+
+    paymentId
+
+creditApplications
+
+    applicationId
+
+workshopJobs
+
+    jobId
+
+ntsaProcesses
+
+    ntsaId
+
+dispatchOrders
+
+    dispatchId
+
+notifications
+
+reports
+Database Models
+Customer
+customerId
+
+name
+
+phone
+
+idNumber
+
+customerType
+
+Passenger
+
+Cargo
+
+email
+
+address
+
+notes
+
+createdBy
+
+createdAt
+Inquiry
+inquiryId
+
+customerId
+
+vehicleId
+
+salesAgent
+
+status
+
+New
+
+Contacted
+
+Negotiating
+
+Converted
+
+Cancelled
+
+notes
+
+createdAt
+Vehicle
+vehicleId
+
+model
+
+price
+
+color
+
+batterySerial
+
+motorSerial
+
+chassisNumber
+
+status
+
+Available
+
+Reserved
+
+Workshop
+
+Delivered
+
+Sold
+
+image
+
+createdAt
+Sale
+saleId
+
+customerId
+
+vehicleId
+
+paymentMethod
+
+Cash
+
+Credit
+
+price
+
+salesAgent
+
+status
+
+Payment Pending
+
+Payment Confirmed
+
+Workshop
+
+NTSA
+
+Ready for Dispatch
+
+Completed
+
+createdAt
+Payment
+paymentId
+
+saleId
+
+amount
+
+paymentMethod
+
+reference
+
+receiptNumber
+
+paymentDate
+
+confirmed
+
+recordedBy
+Credit Application
+applicationId
+
+saleId
+
+financier
+
+status
+
+Pending
+
+Approved
+
+Rejected
+
+Disbursed
+
+documents
+
+submittedAt
+
+updatedAt
+Workshop Job
+jobId
+
+saleId
+
+batteryInspection
+
+motorInspection
+
+accessoriesInstalled
+
+remarks
+
+status
+
+Pending
+
+In Progress
+
+Completed
+
+completedBy
+NTSA Process
+ntsaId
+
+saleId
+
+applicationSubmitted
+
+inspectionCompleted
+
+ownershipTransferred
+
+logbookIssued
+
+status
+
+Pending
+
+Processing
+
+Completed
+Dispatch
+dispatchId
+
+saleId
+
+deliveryDate
+
+receivedBy
+
+remarks
+
+completed
+
+completedAt
+Pages
+Login
+
+Email
+
+Password
+
+Forgot Password
+
+Dashboard
+
+Cards
+
+Total Customers
+
+Active Inquiries
+
+Sales Today
+
+Pending Credit
+
+Vehicles Available
+
+Workshop Jobs
+
+Pending NTSA
+
+Ready for Dispatch
+
+Completed Sales
+
+Charts
+
+Sales this month
+
+Inquiry conversion
+
+Vehicle stock
+
+Recent activities
+
+Customers
+
+Features
+
+Create customer
+
+Edit customer
+
+Delete customer
+
+Search
+
+Pagination
+
+Customer details page
+
+Inquiry Module
+
+Features
+
+Create inquiry
+
+Assign vehicle
+
+Assign sales agent
+
+Update status
+
+Convert to Sale
+
+Timeline of inquiry
+
+Sales Module
+
+Sales List
+
+Sale Details
+
+Payment Method
+
+Cash
+
+Credit
+
+If Cash
+
+Record payment
+
+Generate receipt
+
+Confirm payment
+
+If Credit
+
+Choose financier
+
+Upload documents
+
+Submit application
+
+Update approval status
+
+Record disbursement
+
+Inventory Module
+
+List all vehicles
+
+Search
+
+Filter
+
+Add vehicle
+
+Edit vehicle
+
+Reserve vehicle
+
+Mark sold
+
+Vehicle profile
+
+Workshop Module
+
+Create Job Card
+
+Inspection checklist
+
+Battery inspection
+
+Motor inspection
+
+Accessory installation
+
+Remarks
+
+Complete Job
+
+Status
+
+Pending
+
+In Progress
+
+Completed
+
+NTSA Module
+
+Track
+
+Application Submitted
+
+Inspection
+
+Ownership Transfer
+
+Logbook Issued
+
+Status
+
+Pending
+
+Processing
+
+Completed
+
+Dispatch Module
+
+Display checklist
+
+Payment confirmed
+
+Workshop completed
+
+NTSA completed
+
+If all complete
+
+Enable
+
+Complete Handover
+
+After handover
+
+Update Sale
+
+Completed
+
+Vehicle
+
+Delivered
+
+Reports
+
+Generate
+
+Sales report
+
+Customer report
+
+Inventory report
+
+Workshop report
+
+Dispatch report
+
+Export
+
+CSV
+
+PDF
+
+Users
+
+Admin only
+
+Create User
+
+Deactivate User
+
+Reset Password
+
+Assign Roles
+
+Workflow Logic
+
+Customer Walks In
+
+↓
+
+Create Customer
+
+↓
+
+Create Inquiry
+
+↓
+
+Select Vehicle
+
+↓
+
+Convert Inquiry to Sale
+
+↓
+
+Choose Payment Method
+
+If Cash
+
+↓
+
+Record Payment
+
+↓
+
+Confirm Payment
+
+↓
+
+Automatically Reserve Vehicle
+
+↓
+
+Create Workshop Job
+
+↓
+
+Create NTSA Process
+
+If Credit
+
+↓
+
+Create Credit Application
+
+↓
+
+Wait Approval
+
+↓
+
+Approved?
+
+YES
+
+↓
+
+Record Disbursement
+
+↓
+
+Reserve Vehicle
+
+↓
+
+Create Workshop Job
+
+↓
+
+Create NTSA Process
+
+NO
+
+↓
+
+Reject Sale
+
+Workshop and NTSA should run independently.
+
+Only when BOTH are complete should the sale become
+
+Ready for Dispatch
+
+Dispatch screen must validate
+
+Payment Confirmed
+
+Workshop Completed
+
+NTSA Completed
+
+If any condition fails
+
+Disable handover.
+
+After handover
+
+Sale Status
+
+Completed
+
+Vehicle Status
+
+Delivered
+Firebase Requirements
+
+Use modular Firebase SDK.
+
+Implement reusable services.
+
+Example
+
+services/
+
+    authService.js
+
+    customerService.js
+
+    inquiryService.js
+
+    salesService.js
+
+    inventoryService.js
+
+    workshopService.js
+
+    ntsaService.js
+
+    dispatchService.js
+
+Each service should contain
+
+create
+
+update
+
+delete
+
+getById
+
+getAll
+
+search
+Project Structure
+src/
+
+components/
+
+layouts/
+
+pages/
+
+hooks/
+
+contexts/
+
+services/
+
+utils/
+
+firebase/
+
+assets/
+
+routes/
+
+constants/
+
+styles/
+Coding Standards
+Use functional React components only.
+Use custom hooks where appropriate.
+Avoid duplicate logic.
+Keep components small and reusable.
+Use loading states for async operations.
+Handle Firebase errors gracefully.
+Validate all forms with React Hook Form.
+Use optimistic UI updates where appropriate.
+Keep the code modular and scalable.
+Nice-to-Have Features (If Time Permits)
+Global search across customers, vehicles, and sales.
+Real-time notifications using Firebase listeners.
+Activity log for major actions (e.g., sale created, payment confirmed, job completed).
+Dark mode toggle.
+Dashboard filters by date range.
+Printable receipts and delivery notes.
+Image uploads for vehicles and customer documents using Firebase Storage.
+Expected Outcome
+
+Produce a polished MVP that demonstrates the complete business workflow:
+
+Customer registration.
+Inquiry creation and tracking.
+Inquiry conversion to a sale.
+Cash or credit sales processing.
+Vehicle reservation and inventory updates.
+Parallel Workshop and NTSA processing.
+Dispatch readiness validation.
+Vehicle handover and sale completion.
+Role-based dashboards and permissions.
+Real-time synchronization using Firebase Realtime Database.
+
+The application should prioritize clean architecture, maintainability, and an intuitive user experience over implementing every possible feature. The resulting MVP should be suitable for demonstration to stakeholders to validate the business process before expanding into a full enterprise system.

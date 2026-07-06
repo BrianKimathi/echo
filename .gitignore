@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+.DS_Store
+*.log
+
+# Firebase service account key — NEVER commit
+*firebase-adminsdk*.json
+
+# Database exports
+database.json
