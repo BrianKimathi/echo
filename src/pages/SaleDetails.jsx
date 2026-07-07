@@ -88,7 +88,7 @@ export default function SaleDetails() {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm()
 
   if (loading || !data) {
@@ -121,7 +121,7 @@ export default function SaleDetails() {
   const openAgree = () => {
     reset({
       paymentMethod: sale.paymentMethod || 'Cash',
-      price: sale.price || vehicle?.price || 0,
+      price: sale.price > 0 ? sale.price : '',
       branch: sale.branch || branches[0] || '',
     })
     setAgreeOpen(true)
@@ -697,17 +697,21 @@ export default function SaleDetails() {
             <select className="input" {...register('paymentMethod', { required: 'Required' })}>
               {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
             </select>
+            {errors.paymentMethod && <p className="mt-1 text-xs text-red-500">{errors.paymentMethod.message}</p>}
           </div>
           <div>
             <label className="label">Price (KES)</label>
-            <input type="number" className="input" {...register('price', { required: 'Required', min: 1 })} />
+            <input type="number" className="input" {...register('price', { required: 'Price is required', min: { value: 1, message: 'Price must be greater than 0' } })} placeholder="Enter sale price" />
+            {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price.message}</p>}
           </div>
           <div>
             <label className="label">Branch</label>
-            <select className="input" {...register('branch', { required: 'Required' })}>
+            <select className="input" {...register('branch', { required: 'Branch is required' })}>
               <option value="">Select branch</option>
               {branches.map((b) => <option key={b}>{b}</option>)}
             </select>
+            {errors.branch && <p className="mt-1 text-xs text-red-500">{errors.branch.message}</p>}
+            {branches.length === 0 && <p className="mt-1 text-xs text-amber-600">No branches configured. Add them in Settings.</p>}
           </div>
         </form>
       </Modal>
