@@ -89,7 +89,7 @@ export default function SaleDetails() {
     handleSubmit,
     reset,
     formState: { isSubmitting, errors },
-  } = useForm()
+  } = useForm({ shouldUnregister: true })
 
   if (loading || !data) {
     return (
