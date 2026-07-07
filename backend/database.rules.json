@@ -51,6 +51,10 @@
       "reports": {
         ".read": "auth != null",
         ".write": "auth != null"
+      },
+      "settings": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('tuktukSales/users/' + auth.uid + '/role').val() === 'Admin'"
       }
     }
   }

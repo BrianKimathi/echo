@@ -16,6 +16,7 @@ import {
   customerService,
   inventoryService,
   saleService,
+  settingsService,
 } from '../services'
 import { INQUIRY_STATUS, PAYMENT_METHODS } from '../constants'
 import { formatCurrency, formatDate } from '../utils/helpers'
@@ -24,12 +25,19 @@ export default function InquiryDetails() {
   const { id } = useParams()
   const { profile } = useAuth()
   const { data, loading, reload } = useAsync(async () => {
-    const [inquiry, customers, vehicles] = await Promise.all([
+    const [inquiry, customers, vehicles, settings] = await Promise.all([
       inquiryService.getById(id),
       customerService.getAll(),
       inventoryService.getAll(),
+      settingsService.getAll(),
     ])
-    return { inquiry, customer: customers.find((c) => c.id === inquiry?.customerId), vehicle: vehicles.find((v) => v.id === inquiry?.vehicleId), vehicles }
+    return {
+      inquiry,
+      customer: customers.find((c) => c.id === inquiry?.customerId),
+      vehicle: vehicles.find((v) => v.id === inquiry?.vehicleId),
+      vehicles,
+      settings,
+    }
   }, [id])
 
   const [statusOpen, setStatusOpen] = useState(false)
@@ -49,7 +57,7 @@ export default function InquiryDetails() {
     )
   }
 
-  const { inquiry, customer, vehicle, vehicles } = data
+  const { inquiry, customer, vehicle, vehicles, settings } = data
   if (!inquiry) {
     return (
       <AppLayout>
@@ -75,6 +83,7 @@ export default function InquiryDetails() {
       vehicleId: inquiry.vehicleId,
       paymentMethod: 'Cash',
       price: vehicle?.price || 0,
+      branch: settings?.branches?.[0] || '',
     })
     setConvertOpen(true)
   }
@@ -87,6 +96,7 @@ export default function InquiryDetails() {
         paymentMethod: formData.paymentMethod,
         price: Number(formData.price),
         salesAgent: inquiry.salesAgent,
+        branch: formData.branch,
       })
       await inquiryService.update(id, { status: 'Converted', saleId })
       toast.success('Inquiry converted to sale')
@@ -235,6 +245,13 @@ export default function InquiryDetails() {
             <label className="label">Payment Method</label>
             <select className="input" {...register('paymentMethod')}>
               {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Branch</label>
+            <select className="input" {...register('branch', { required: 'Required' })}>
+              <option value="">Select branch</option>
+              {(settings?.branches || []).map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
           <div>

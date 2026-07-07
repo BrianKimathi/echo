@@ -2,9 +2,10 @@ import { create, getAll, getById, updateById, removeById, textSearch } from './d
 import { workshopService } from './workshopService'
 import { ntsaService } from './ntsaService'
 import { inventoryService } from './inventoryService'
+import { VAT_RATE } from '../constants'
 
 const PATH = 'sales'
-const SEARCH_FIELDS = ['customerId', 'vehicleId', 'salesAgent', 'status', 'paymentMethod']
+const SEARCH_FIELDS = ['customerId', 'vehicleId', 'salesAgent', 'status', 'paymentMethod', 'invoiceNumber', 'registrationNo']
 
 export const saleService = {
   create: (data) => create(PATH, { ...data, createdAt: Date.now() }),
@@ -18,7 +19,7 @@ export const saleService = {
    * Convert an inquiry into a sale. Reserves the vehicle and updates inquiry status.
    * Payment confirmation triggers workshop + NTSA creation (see confirmPayment).
    */
-  convertFromInquiry: async ({ inquiry, vehicleId, paymentMethod, price, salesAgent }) => {
+  convertFromInquiry: async ({ inquiry, vehicleId, paymentMethod, price, salesAgent, branch }) => {
     const saleData = {
       customerId: inquiry.customerId,
       vehicleId,
@@ -26,6 +27,7 @@ export const saleService = {
       paymentMethod,
       price,
       salesAgent,
+      branch: branch || '',
       status: 'Payment Pending',
     }
     const saleId = await create(PATH, { ...saleData, createdAt: Date.now() })
@@ -64,5 +66,26 @@ export const saleService = {
   completeHandover: async (saleId, vehicleId) => {
     await updateById(PATH, saleId, { status: 'Completed', completedAt: Date.now() })
     await inventoryService.update(vehicleId, { status: 'Delivered' })
+  },
+
+  /**
+   * Save the sale's invoice details (registration no, VAT, etc.) and stamp
+   * an invoice number if one is not already present. Returns the updated sale.
+   */
+  saveInvoice: async (saleId, { registrationNo, vatRate = VAT_RATE, invoiceNumber }) => {
+    const sale = await getById(PATH, saleId)
+    if (!sale) throw new Error('Sale not found')
+    const price = Number(sale.price || 0)
+    const vatAmount = Math.round(price * vatRate)
+    const payload = {
+      registrationNo: registrationNo || sale.registrationNo || '',
+      vatRate,
+      vatAmount,
+      totalAmount: price + vatAmount,
+      invoiceNumber: invoiceNumber || sale.invoiceNumber,
+      invoicedAt: sale.invoicedAt || Date.now(),
+    }
+    await updateById(PATH, saleId, payload)
+    return { ...sale, ...payload }
   },
 }

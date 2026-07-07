@@ -11,6 +11,7 @@ export const NAV_ITEMS = [
   { to: '/dispatch', label: 'Dispatch', icon: 'FiPackage', roles: [ROLES.ADMIN, ROLES.DISPATCH_OFFICER] },
   { to: '/reports', label: 'Reports', icon: 'FiBarChart2', roles: [ROLES.ADMIN, ROLES.FINANCE_OFFICER] },
   { to: '/users', label: 'Users', icon: 'FiUserPlus', roles: [ROLES.ADMIN] },
+  { to: '/settings', label: 'Settings', icon: 'FiSettings', roles: [ROLES.ADMIN] },
 ]
 
 export const ROLE_NAV = (role) => NAV_ITEMS.filter((item) => item.roles.includes(role))

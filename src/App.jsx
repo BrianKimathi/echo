@@ -18,6 +18,7 @@ import NTSA from './pages/NTSA'
 import Dispatch from './pages/Dispatch'
 import Reports from './pages/Reports'
 import Users from './pages/Users'
+import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 
 const ALL = Object.values(ROLES)
@@ -54,6 +55,7 @@ export default function App() {
       <Route path="/reports" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANCE_OFFICER]}><Reports /></ProtectedRoute>} />
 
       <Route path="/users" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Users /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Settings /></ProtectedRoute>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<NotFound />} />

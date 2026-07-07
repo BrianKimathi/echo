@@ -40,7 +40,7 @@ export default function Inventory() {
 
   const openCreate = () => {
     setEditing(null)
-    reset({ model: '', price: '', color: '', batterySerial: '', motorSerial: '', chassisNumber: '', status: 'Available' })
+    reset({ model: '', price: '', color: '', batterySerial: '', motorSerial: '', chassisNumber: '', registrationNo: '', status: 'Available', dateReceivedFromFactory: '', ntsaBookingDate: '' })
     setPendingFiles([])
     setPendingPreviews([])
     setModalOpen(true)
@@ -322,12 +322,24 @@ export default function Inventory() {
             <input className="input" {...register('chassisNumber')} />
           </div>
           <div>
+            <label className="label">Registration No.</label>
+            <input className="input" {...register('registrationNo')} placeholder="e.g. KMEA 123A" />
+          </div>
+          <div>
             <label className="label">Battery Serial</label>
             <input className="input" {...register('batterySerial')} />
           </div>
-          <div className="sm:col-span-2">
+          <div>
             <label className="label">Motor Serial</label>
             <input className="input" {...register('motorSerial')} />
+          </div>
+          <div>
+            <label className="label">Date Received From Factory</label>
+            <input type="date" className="input" {...register('dateReceivedFromFactory')} />
+          </div>
+          <div>
+            <label className="label">Booked at NTSA for Inspection</label>
+            <input type="date" className="input" {...register('ntsaBookingDate')} />
           </div>
 
           {/* Image Upload */}

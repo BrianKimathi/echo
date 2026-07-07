@@ -57,6 +57,41 @@ export const PAYMENT_STATUS = ['Pending', 'Confirmed']
 
 export const CREDIT_STATUS = ['Pending', 'Approved', 'Rejected', 'Disbursed']
 
+// Default financiers seeded into the dashboard Settings. Admins can add or
+// remove entries from the Settings page; these are only the starting values.
+export const DEFAULT_FINANCIERS = [
+  'Watu Credit Ltd',
+  'Rafiki Bank',
+  'M-Kopa Credit Ltd',
+  'Fortune Credit',
+]
+
+// Default branches seeded into the dashboard Settings. A branch is attached to
+// each sale when it is created.
+export const DEFAULT_BRANCHES = [
+  'Mombasa',
+  'Bungoma',
+  'Malindi',
+  'Nairobi',
+  'Kisumu',
+  'Eldoret',
+  'Nakuru',
+  'Thika',
+]
+
+// Document categories required for a credit application. Each applicant must
+// upload at least one file per category. `guarantors` may hold multiple files
+// (one or more guarantors).
+export const CREDIT_DOCUMENT_TYPES = [
+  { key: 'id', label: 'National ID' },
+  { key: 'kraPin', label: 'KRA PIN Certificate' },
+  { key: 'drivingLicense', label: 'Driving License' },
+  { key: 'guarantors', label: "Guarantor's Documents" },
+]
+
+// Standard VAT rate applied on the vehicle price (Kenya 16%).
+export const VAT_RATE = 0.16
+
 export const WORKSHOP_STATUS = ['Pending', 'In Progress', 'Completed']
 
 export const NTSA_STATUS = ['Pending', 'Processing', 'Completed']

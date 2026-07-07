@@ -46,6 +46,20 @@ export const saleNumber = () => {
   return `SAL-${d}-${r}`
 }
 
+export const invoiceNumber = () => {
+  const d = dayjs().format('YYYYMMDD')
+  const r = Math.floor(1000 + Math.random() * 9000)
+  return `INV-${d}-${r}`
+}
+
+export const deliveryNoteNumber = () => {
+  const d = dayjs().format('YYYYMMDD')
+  const r = Math.floor(1000 + Math.random() * 9000)
+  return `DN-${d}-${r}`
+}
+
+export const computeVat = (amount, rate = 0.16) => Math.round(Number(amount || 0) * rate)
+
 export const downloadFile = (content, filename, type = 'text/csv') => {
   const blob = new Blob([content], { type })
   const url = URL.createObjectURL(blob)
