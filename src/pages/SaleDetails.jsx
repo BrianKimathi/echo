@@ -86,6 +86,7 @@ export default function SaleDetails() {
   const [assignOpen, setAssignOpen] = useState(false)
   const [dispatchOpen, setDispatchOpen] = useState(false)
   const [invoiceOpen, setInvoiceOpen] = useState(false)
+  const [preDeliveryOpen, setPreDeliveryOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   // Each modal gets its own useForm instance so fields from one modal can
@@ -96,6 +97,7 @@ export default function SaleDetails() {
   const assignForm = useForm()
   const dispatchForm = useForm()
   const invoiceForm = useForm()
+  const preDeliveryForm = useForm()
 
   if (loading || !data) {
     return (
@@ -404,9 +406,6 @@ export default function SaleDetails() {
   }
 
   // ----- Pre-delivery service -----
-  const [preDeliveryOpen, setPreDeliveryOpen] = useState(false)
-  const preDeliveryForm = useForm()
-
   const openPreDelivery = () => {
     const existing = sale.preDeliveryChecklist || {}
     preDeliveryForm.reset({
