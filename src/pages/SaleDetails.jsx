@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import {
@@ -90,7 +90,61 @@ export default function SaleDetails() {
     handleSubmit,
     reset,
     formState: { isSubmitting, errors },
-  } = useForm()
+  } = useForm({ shouldUnregister: true })
+
+  // Reset form values AFTER each modal opens so the (now-mounted) fields
+  // receive the values. With shouldUnregister=true, calling reset() before
+  // the fields mount would lose the values.
+  useEffect(() => {
+    if (!agreeOpen || !data?.sale) return
+    reset({
+      paymentMethod: data.sale.paymentMethod || 'Cash',
+      price: data.sale.price > 0 ? data.sale.price : '',
+      branch: data.sale.branch || (data.settings?.branches || [])[0] || '',
+    })
+  }, [agreeOpen, data, reset])
+
+  useEffect(() => {
+    if (!payOpen || !data?.sale) return
+    reset({
+      amount: data.sale.price,
+      paymentMethod: 'Cash',
+      reference: '',
+      paymentDate: dayjs().format('YYYY-MM-DD'),
+    })
+  }, [payOpen, data, reset])
+
+  useEffect(() => {
+    if (!creditOpen || !data) return
+    reset({
+      financier: data.credit?.financier || '',
+      status: data.credit?.status || 'Loan Requested',
+    })
+  }, [creditOpen, data, reset])
+
+  useEffect(() => {
+    if (!assignOpen || !data?.sale) return
+    reset({ vehicleId: data.sale.vehicleId || '' })
+  }, [assignOpen, data, reset])
+
+  useEffect(() => {
+    if (!dispatchOpen || !data) return
+    reset({
+      deliveryDate: dayjs().format('YYYY-MM-DD'),
+      receivedBy: data.customer?.name || '',
+      remarks: '',
+    })
+  }, [dispatchOpen, data, reset])
+
+  useEffect(() => {
+    if (!invoiceOpen || !data?.sale) return
+    reset({
+      registrationNo: data.sale.registrationNo || data.vehicle?.registrationNo || '',
+      vatRate: VAT_RATE,
+      invoiceNumber: data.sale.invoiceNumber || invoiceNumber(),
+      invoiceDate: data.sale.invoicedAt ? dayjs(data.sale.invoicedAt).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+    })
+  }, [invoiceOpen, data, reset])
 
   if (loading || !data) {
     return (
@@ -119,14 +173,7 @@ export default function SaleDetails() {
   const creditDocs = credit?.documents || {}
 
   // ----- Agree to proceed -----
-  const openAgree = () => {
-    reset({
-      paymentMethod: sale.paymentMethod || 'Cash',
-      price: sale.price > 0 ? sale.price : '',
-      branch: sale.branch || branches[0] || '',
-    })
-    setAgreeOpen(true)
-  }
+  const openAgree = () => setAgreeOpen(true)
 
   const doAgree = async (formData) => {
     try {
@@ -153,15 +200,7 @@ export default function SaleDetails() {
   }
 
   // ----- Cash payment -----
-  const openPayment = () => {
-    reset({
-      amount: sale.price,
-      paymentMethod: 'Cash',
-      reference: '',
-      paymentDate: dayjs().format('YYYY-MM-DD'),
-    })
-    setPayOpen(true)
-  }
+  const openPayment = () => setPayOpen(true)
 
   const recordPayment = async (formData) => {
     try {
@@ -224,13 +263,7 @@ export default function SaleDetails() {
   }
 
   // ----- Credit / loan flow -----
-  const openCredit = () => {
-    reset({
-      financier: credit?.financier || '',
-      status: credit?.status || 'Loan Requested',
-    })
-    setCreditOpen(true)
-  }
+  const openCredit = () => setCreditOpen(true)
 
   const saveCredit = async (formData) => {
     try {
@@ -312,10 +345,7 @@ export default function SaleDetails() {
   }
 
   // ----- Assign unit -----
-  const openAssign = () => {
-    reset({ vehicleId: sale.vehicleId || '' })
-    setAssignOpen(true)
-  }
+  const openAssign = () => setAssignOpen(true)
 
   const doAssign = async (formData) => {
     try {
@@ -340,14 +370,7 @@ export default function SaleDetails() {
   }
 
   // ----- Dispatch -----
-  const openDispatch = () => {
-    reset({
-      deliveryDate: dayjs().format('YYYY-MM-DD'),
-      receivedBy: customer?.name || '',
-      remarks: '',
-    })
-    setDispatchOpen(true)
-  }
+  const openDispatch = () => setDispatchOpen(true)
 
   const doDispatch = async (formData) => {
     try {
@@ -365,15 +388,7 @@ export default function SaleDetails() {
   }
 
   // ----- Invoice -----
-  const openInvoice = () => {
-    reset({
-      registrationNo: sale.registrationNo || vehicle?.registrationNo || '',
-      vatRate: VAT_RATE,
-      invoiceNumber: sale.invoiceNumber || invoiceNumber(),
-      invoiceDate: sale.invoicedAt ? dayjs(sale.invoicedAt).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
-    })
-    setInvoiceOpen(true)
-  }
+  const openInvoice = () => setInvoiceOpen(true)
 
   const saveInvoice = async (formData) => {
     try {
@@ -756,7 +771,7 @@ export default function SaleDetails() {
 
       {/* Agree to Proceed Modal */}
       <Modal open={agreeOpen} onClose={() => setAgreeOpen(false)} title="Agree to Proceed">
-        <form onSubmit={handleSubmit(doAgree)} className="space-y-4">
+        <form onSubmit={handleSubmit(doAgree, () => toast.error('Please fill all required fields'))} className="space-y-4">
           <div>
             <label className="label">Payment Method</label>
             <select className="input" {...register('paymentMethod', { required: 'Required' })}>
