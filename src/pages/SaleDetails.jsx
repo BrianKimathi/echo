@@ -38,6 +38,7 @@ import {
   PAYMENT_METHODS,
   CREDIT_STATUS,
   CREDIT_DOCUMENT_TYPES,
+  CUSTOMER_DOCUMENT_TYPES,
   VAT_RATE,
   SALE_FLOW_CASH,
   SALE_FLOW_CREDIT,
@@ -89,7 +90,7 @@ export default function SaleDetails() {
     handleSubmit,
     reset,
     formState: { isSubmitting, errors },
-  } = useForm({ shouldUnregister: true })
+  } = useForm()
 
   if (loading || !data) {
     return (
@@ -275,6 +276,34 @@ export default function SaleDetails() {
   const removeDoc = async (category, index) => {
     try {
       await creditService.removeDocument(credit.id, category, index)
+      toast.success('Document removed')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  // ----- Customer document upload (all customers, any stage) -----
+  const uploadCustomerDocs = async (category, e) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length || !customer) return
+    setUploading(true)
+    try {
+      const uploaded = await uploadMany(`customers/${customer.id}/${category}`, files)
+      await customerService.addDocuments(customer.id, category, uploaded)
+      toast.success('Documents uploaded')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const removeCustomerDoc = async (category, index) => {
+    try {
+      await customerService.removeDocument(customer.id, category, index)
       toast.success('Document removed')
       reload()
     } catch (err) {
@@ -683,6 +712,47 @@ export default function SaleDetails() {
           )}
         </Card>
       </div>
+
+      {/* Customer Documents (available for ALL customers at any stage) */}
+      <Card className="mt-4">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-700">Customer Documents</h3>
+          {customer && (
+            <Link to={`/customers/${customer.id}`} className="text-sm text-primary hover:underline">
+              View customer profile
+            </Link>
+          )}
+        </div>
+        <div className="space-y-3">
+          {CUSTOMER_DOCUMENT_TYPES.map((doc) => {
+            const customerDocs = customer?.documents || {}
+            const files = customerDocs[doc.key] || []
+            return (
+              <div key={doc.key} className="rounded-xl border border-slate-100 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">{doc.label} <span className="text-xs text-slate-400">({files.length})</span></p>
+                  {canManage && (
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
+                      {uploading ? 'Uploading…' : (<><FiUpload size={13} /> Upload</>)}
+                      <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => uploadCustomerDocs(doc.key, e)} disabled={uploading} />
+                    </label>
+                  )}
+                </div>
+                {files.length > 0 ? (
+                  <div className="space-y-1">
+                    {files.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">📄 {d.name}</a>
+                        {canManage && <button className="btn-ghost p-1 text-red-500" onClick={() => removeCustomerDoc(doc.key, i)}><FiTrash2 size={14} /></button>}
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-slate-400">No file uploaded</p>}
+              </div>
+            )
+          })}
+        </div>
+      </Card>
 
       {/* Agree to Proceed Modal */}
       <Modal open={agreeOpen} onClose={() => setAgreeOpen(false)} title="Agree to Proceed">

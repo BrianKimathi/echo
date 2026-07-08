@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiPhone, FiMail, FiMapPin, FiUser } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit2, FiPhone, FiMail, FiMapPin, FiUser, FiUpload, FiTrash2 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 import AppLayout from '../components/layouts/AppLayout'
@@ -10,13 +10,16 @@ import StatusSteps from '../components/ui/StatusSteps'
 import Modal from '../components/ui/Modal'
 import { ButtonLoader, SectionLoader } from '../components/ui/Spinner'
 import { useAsync } from '../hooks/useAsync'
-import { customerService, saleService } from '../services'
-import { SALE_FLOW_CASH, SALE_FLOW_CREDIT, SALE_TERMINAL_STATUSES } from '../constants'
+import { useAuth } from '../contexts/AuthContext'
+import { customerService, saleService, uploadMany } from '../services'
+import { SALE_FLOW_CASH, SALE_FLOW_CREDIT, SALE_TERMINAL_STATUSES, CUSTOMER_DOCUMENT_TYPES } from '../constants'
 import { formatCurrency, formatDate } from '../utils/helpers'
 import { useForm } from 'react-hook-form'
+import { can } from '../utils/permissions'
 
 export default function CustomerDetails() {
   const { id } = useParams()
+  const { profile } = useAuth()
   const { data, loading, reload } = useAsync(async () => {
     const [customer, sales] = await Promise.all([
       customerService.getById(id),
@@ -29,6 +32,7 @@ export default function CustomerDetails() {
   }, [id])
 
   const [editOpen, setEditOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const {
     register,
     handleSubmit,
@@ -83,6 +87,36 @@ export default function CustomerDetails() {
       reload()
     } catch (e) {
       toast.error(e.message)
+    }
+  }
+
+  const canManage = can.manageSales(profile?.role)
+
+  // ----- Customer document upload -----
+  const uploadCustomerDocs = async (category, e) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    setUploading(true)
+    try {
+      const uploaded = await uploadMany(`customers/${id}/${category}`, files)
+      await customerService.addDocuments(id, category, uploaded)
+      toast.success('Documents uploaded')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const removeCustomerDoc = async (category, index) => {
+    try {
+      await customerService.removeDocument(id, category, index)
+      toast.success('Document removed')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
     }
   }
 
@@ -170,6 +204,40 @@ export default function CustomerDetails() {
           )}
         </Card>
       </div>
+
+      {/* Customer Documents */}
+      <Card className="mt-4">
+        <h3 className="mb-4 font-semibold text-slate-700">Customer Documents</h3>
+        <div className="space-y-3">
+          {CUSTOMER_DOCUMENT_TYPES.map((doc) => {
+            const customerDocs = customer.documents || {}
+            const files = customerDocs[doc.key] || []
+            return (
+              <div key={doc.key} className="rounded-xl border border-slate-100 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">{doc.label} <span className="text-xs text-slate-400">({files.length})</span></p>
+                  {canManage && (
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
+                      {uploading ? 'Uploading…' : (<><FiUpload size={13} /> Upload</>)}
+                      <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => uploadCustomerDocs(doc.key, e)} disabled={uploading} />
+                    </label>
+                  )}
+                </div>
+                {files.length > 0 ? (
+                  <div className="space-y-1">
+                    {files.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
+                        <a href={d.url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">📄 {d.name}</a>
+                        {canManage && <button className="btn-ghost p-1 text-red-500" onClick={() => removeCustomerDoc(doc.key, i)}><FiTrash2 size={14} /></button>}
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-slate-400">No file uploaded</p>}
+              </div>
+            )
+          })}
+        </div>
+      </Card>
 
       <Modal
         open={editOpen}

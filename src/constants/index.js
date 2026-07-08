@@ -153,6 +153,17 @@ export const CREDIT_DOCUMENT_TYPES = [
   { key: 'guarantors', label: "Guarantor's Documents" },
 ]
 
+// Document categories for any customer in the purchase flow. Available for
+// ALL customers regardless of payment method so documents can be uploaded
+// during the sale instead of only in Settings.
+export const CUSTOMER_DOCUMENT_TYPES = [
+  { key: 'id', label: 'National ID' },
+  { key: 'kraPin', label: 'KRA PIN Certificate' },
+  { key: 'drivingLicense', label: 'Driving License' },
+  { key: 'passportPhoto', label: 'Passport Photo' },
+  { key: 'guarantors', label: "Guarantor's Documents" },
+]
+
 // Standard VAT rate applied on the vehicle price (Kenya 16%).
 export const VAT_RATE = 0.16
 
