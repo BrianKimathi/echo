@@ -267,7 +267,7 @@ export default function VehicleDetails() {
             </select>
           </div>
           <div>
-            <label className="label">Price (KES)</label>
+            <label className="label">Price (KSH)</label>
             <input type="number" className="input" {...register('price', { required: 'Required' })} />
           </div>
           <div>

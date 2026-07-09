@@ -320,7 +320,7 @@ export default function Inventory() {
             {errors.model && <p className="mt-1 text-xs text-red-500">{errors.model.message}</p>}
           </div>
           <div>
-            <label className="label">Price (KES)</label>
+            <label className="label">Price (KSH)</label>
             <input type="number" className="input" {...register('price', { required: 'Required', min: 1 })} />
             {errors.price && <p className="mt-1 text-xs text-red-500">{errors.price.message}</p>}
           </div>

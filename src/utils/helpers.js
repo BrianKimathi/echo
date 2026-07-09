@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 
 export const formatCurrency = (amount) => {
   const num = Number(amount || 0)
-  return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(num)
+  return 'KSH ' + new Intl.NumberFormat('en-KE', { maximumFractionDigits: 0 }).format(num)
 }
 
 export const formatDate = (date, fmt = 'DD MMM YYYY') => {

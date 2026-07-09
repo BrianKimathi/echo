@@ -453,37 +453,162 @@ export default function SaleDetails() {
     const rate = sale.vatRate ?? VAT_RATE
     const vat = computeVat(price, rate)
     const total = price + vat
+    const totalConfirmed = payments.filter((p) => p.confirmed).reduce((sum, p) => sum + p.amount, 0)
+    const balance = total - totalConfirmed
+    
     const w = window.open('', '_blank', 'width=800,height=900')
     w.document.write(`
       <html><head><title>Invoice ${sale.invoiceNumber || ''}</title>
       <style>
-        body{font-family:Arial,sans-serif;padding:30px;color:#0f172a}
-        h1{color:#0B6E4F;margin:0}
-        .head{display:flex;justify-content:space-between;border-bottom:2px solid #0B6E4F;padding-bottom:12px;margin-bottom:16px}
-        .muted{color:#64748b;font-size:13px}
-        table{width:100%;border-collapse:collapse;margin-top:12px}
-        th,td{padding:8px 6px;text-align:left;font-size:13px;border-bottom:1px solid #e2e8f0}
-        th{background:#f1f5f9}
-        .tot{display:flex;justify-content:space-between;font-size:13px;margin:4px 0}
-        .grand{font-weight:bold;font-size:16px;border-top:2px solid #0B6E4F;padding-top:8px;margin-top:8px}
+        @page { margin: 10mm; }
+        body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 14px; color: #000; padding: 20px; }
+        .flex { display: flex; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        
+        .header { display: flex; align-items: center; margin-bottom: 5px; }
+        .logo-box { width: 180px; height: 140px; background-color: #5cb85c; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; margin-right: 20px; }
+        .logo-d { font-size: 60px; font-weight: bold; color: #ff3333; line-height: 1; margin-bottom: 5px; }
+        .logo-text { font-size: 20px; font-weight: bold; letter-spacing: 1px; }
+        .logo-sub { font-size: 11px; font-weight: bold; }
+        
+        .company-info { flex: 1; text-align: center; color: #00B050; }
+        .company-info h1 { font-size: 28px; margin: 0 0 10px 0; font-weight: bold; }
+        .company-info p { margin: 5px 0; font-size: 16px; font-weight: bold; }
+        .company-info .email { font-style: italic; text-decoration: underline; }
+        
+        .green-line { height: 4px; background-color: #00B050; margin-bottom: 20px; }
+        
+        .top-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .top-col p { margin: 8px 0; font-size: 14px; }
+        .bold { font-weight: bold; }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th { background-color: #000; color: #fff; padding: 8px; text-align: center; font-size: 14px; }
+        td { border-bottom: 1px solid #e0e0e0; padding: 12px 8px; vertical-align: top; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        
+        .item-details p { margin: 4px 0; font-size: 13px; }
+        .item-title { font-weight: bold; margin-bottom: 8px; font-size: 14px; }
+        .bold-desc { font-weight: bold; margin-top: 10px; margin-bottom: 4px; }
+        
+        .summary-container { display: flex; justify-content: space-between; align-items: flex-start; }
+        .amount-box { background-color: #8C8C8C; color: #000; padding: 6px 12px; font-weight: bold; font-size: 14px; margin-top: 80px; display: inline-block; width: 300px; }
+        
+        .summary-table { width: 350px; border-collapse: collapse; margin-top: -20px; }
+        .summary-table td { padding: 6px 8px; border: none; font-size: 14px; }
+        .summary-table .bold { font-weight: bold; }
+        .summary-table .total-row { background-color: #8C8C8C; font-weight: bold; border-top: 1px solid #fff; }
+        
+        .notes-section { margin-top: 40px; font-size: 14px; line-height: 1.6; }
+        .notes-section p { margin: 4px 0; }
       </style></head><body>
-      <div class="head">
-        <div>
-          <img src="https://placehold.co/150x50/0B6E4F/FFF?text=Letterhead" alt="Company Logo" style="max-height:50px;margin-bottom:10px" />
-          <h1>Tuk-Tuk e-Mobility</h1>
-          <p class="muted">${sale.branch || '-'} Branch</p>
+      
+      <div class="header">
+        <div class="logo-box">
+          <div class="logo-d">D</div>
+          <div class="logo-text">DONPAV</div>
+          <div class="logo-sub">ELECTRIC LTD</div>
         </div>
-        <div style="text-align:right"><p style="font-size:18px;font-weight:bold">INVOICE</p><p class="muted">${sale.invoiceNumber || '-'}</p><p class="muted">Date: ${sale.invoicedAt ? formatDate(sale.invoicedAt) : formatDate(Date.now())}</p></div>
+        <div class="company-info">
+          <h1>DONPAV ELECTRIC LIMITED</h1>
+          <p>Authorised Dealers of Rhinggo electric tuk tuk and motorbikes</p>
+          <p>Location: Kisauni-Majengo-Diani-Kisumu</p>
+          <p>Tel: 0721 904 506 – 0720 320 233 – 0719 403 028</p>
+          <p class="email">Email: donrhinggo@gmail.com</p>
+        </div>
       </div>
-      <div style="margin-bottom:16px"><p class="muted">Bill To</p><p style="font-weight:bold">${customer?.name || '-'}</p><p class="muted">${customer?.phone || ''}</p></div>
-      <table><thead><tr><th>Description</th><th>Reg. No.</th><th>Chassis No.</th><th>Engine No.</th><th style="text-align:right">Amount</th></tr></thead>
-      <tbody><tr><td>${vehicle?.model || '-'} (${vehicle?.color || ''})</td><td>${sale.registrationNo || vehicle?.registrationNo || '-'}</td><td>${vehicle?.chassisNumber || '-'}</td><td>${vehicle?.engineNumber || '-'}</td><td style="text-align:right">${formatCurrency(price)}</td></tr></tbody></table>
-      <div style="max-width:300px;margin-left:auto;margin-top:16px">
-        <div class="tot"><span>Subtotal</span><span>${formatCurrency(price)}</span></div>
-        <div class="tot"><span>VAT (${(rate * 100).toFixed(0)}%)</span><span>${formatCurrency(vat)}</span></div>
-        <div class="tot grand"><span>Total</span><span>${formatCurrency(total)}</span></div>
+      <div class="green-line"></div>
+      
+      <div class="flex justify-between" style="margin-bottom: 40px;">
+        <div>INVOICE</div>
+        <div class="bold">KRA:P052482064D</div>
       </div>
-      <p class="muted" style="margin-top:30px">Payment method: ${sale.paymentMethod}</p>
+      
+      <div class="top-row">
+        <div class="top-col">
+          <p><span class="bold">BILL TO:</span> ${customer?.name || '-'}</p>
+          <p><span class="bold">ID:</span> ${customer?.idNumber || '-'} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Quote Date ${formatDate(sale.invoicedAt || Date.now()).toUpperCase()}</p>
+          <p><span class="bold">KRA PIN:</span> ${customer?.kraPin || 'N/A'}</p>
+        </div>
+        <div class="top-col text-right">
+          <p>${sale.invoiceNumber ? '#' + sale.invoiceNumber : ''}</p>
+        </div>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 5%">#</th>
+            <th style="width: 45%; text-align: left;">Item & Description</th>
+            <th style="width: 10%">Qty</th>
+            <th style="width: 15%">Rate</th>
+            <th style="width: 10%">VAT%</th>
+            <th style="width: 15%">Vatable Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-center">1</td>
+            <td class="item-details">
+              <div class="item-title">${vehicle?.model || '-'} With solar</div>
+              <div class="bold-desc">LOGBOOK TRANSFER</div>
+              <p>Peak power-kw 6</p>
+              <p>Maximum speed; 45km/h</p>
+              <p>Brake system; Hydraulic brake</p>
+              <p>Registration number: ${sale.registrationNo || vehicle?.registrationNo || '-'}</p>
+              <p>Chassis number; ${vehicle?.chassisNumber || '-'}</p>
+              <p>Engine number; ${vehicle?.engineNumber || '-'}</p>
+            </td>
+            <td class="text-center">1</td>
+            <td class="text-right">${formatCurrency(price).replace('KSH ', '')}</td>
+            <td class="text-center">${(rate * 100).toFixed(2)}</td>
+            <td class="text-right">${formatCurrency(price).replace('KSH ', '')}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="summary-container">
+        <div>
+          <div class="amount-box">AMOUNT: ${formatCurrency(balance).replace('KSH ', '')} KSH</div>
+        </div>
+        <div>
+          <table class="summary-table">
+            <tr>
+              <td class="bold">Sub total</td>
+              <td class="text-right bold">${formatCurrency(price).replace('KSH ', '')}</td>
+            </tr>
+            <tr>
+              <td class="bold">Downpayment</td>
+              <td class="text-right bold">${formatCurrency(totalConfirmed).replace('KSH ', '')}</td>
+            </tr>
+            <tr>
+              <td class="bold">${rate === 0 ? 'Zero Rate (0 %)' : 'VAT (' + (rate * 100) + ' %)'}</td>
+              <td class="text-right bold">${formatCurrency(vat).replace('KSH ', '')}</td>
+            </tr>
+            <tr class="total-row">
+              <td>Total</td>
+              <td class="text-right">KSH ${formatCurrency(balance).replace('KSH ', '')}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      
+      <div class="notes-section">
+        <p>Notes</p>
+        <p>Looking forward for your business</p>
+        <p><span class="bold">ACCOUNT NAME:</span> DONPAV ELECTRIC LTD-MANAGEMENT ACCOUNT</p>
+        <p><span class="bold">ACCOUNT NO:</span> 092000034340</p>
+        <p><span class="bold">BANK CODE:</span> 70</p>
+        <p><span class="bold">BRANCH CODE:</span> 092</p>
+        <p style="margin-top: 15px;"><span class="bold">SWIFT CODE:</span> FABLKENA</p>
+      </div>
+      
+      <div style="page-break-before: always; margin-top: 40px;">
+        <p>Terms & Conditions</p>
+      </div>
+      
       </body></html>`)
     w.document.close()
     w.print()
@@ -758,8 +883,17 @@ export default function SaleDetails() {
           {/* 4. Unit assigned → raise invoice */}
           {sale.status === 'Unit Assigned' && canManage && (
             <div className="rounded-xl bg-slate-50 p-6 text-center">
-              <p className="text-sm text-slate-500">Unit assigned. Raise an invoice for the customer.</p>
-              <button className="btn-primary mt-4" onClick={openInvoice}><FiFileText /> Raise Invoice</button>
+              {isCredit && !paymentConfirmed ? (
+                <>
+                  <p className="mb-3 text-sm text-red-500 font-medium">A down payment must be recorded and confirmed before you can raise an invoice.</p>
+                  <button className="btn-primary" disabled><FiFileText /> Raise Invoice</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-500">Unit assigned. Raise an invoice for the customer.</p>
+                  <button className="btn-primary mt-4" onClick={openInvoice}><FiFileText /> Raise Invoice</button>
+                </>
+              )}
             </div>
           )}
 
@@ -888,7 +1022,7 @@ export default function SaleDetails() {
             </div>
           )}
           <div>
-            <label className="label">Price (KES)</label>
+            <label className="label">Price (KSH)</label>
             <input type="number" className="input" {...agreeForm.register('price', { required: 'Price is required', min: { value: 1, message: 'Price must be greater than 0' } })} placeholder="Enter sale price" />
             {agreeForm.formState.errors.price && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.price.message}</p>}
           </div>
@@ -911,7 +1045,7 @@ export default function SaleDetails() {
       {/* Payment Modal */}
       <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Record Payment">
         <form onSubmit={payForm.handleSubmit(recordPayment)} className="space-y-4">
-          <div><label className="label">Amount (KES)</label><input type="number" className="input" {...payForm.register('amount', { required: 'Required', min: 1 })} /></div>
+          <div><label className="label">Amount (KSH)</label><input type="number" className="input" {...payForm.register('amount', { required: 'Required', min: 1 })} /></div>
           <div><label className="label">Payment Method</label><select className="input" {...payForm.register('paymentMethod')}><option>Cash</option><option>Bank Transfer</option><option>M-Pesa</option><option>Cheque</option></select></div>
           <div><label className="label">Reference</label><input className="input" {...payForm.register('reference')} /></div>
           <div><label className="label">Payment Date</label><input type="date" className="input" {...payForm.register('paymentDate', { required: 'Required' })} /></div>
@@ -984,7 +1118,7 @@ export default function SaleDetails() {
           </div>
           <div><label className="label">Registration No.</label><input className="input" {...invoiceForm.register('registrationNo')} placeholder="e.g. KMEA 123A" /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Total Amount (KES)</label><input className="input" value={formatCurrency(sale.price)} disabled /></div>
+            <div><label className="label">Total Amount (KSH)</label><input className="input" value={formatCurrency(sale.price)} disabled /></div>
             <div><label className="label">VAT Rate</label><select className="input" {...invoiceForm.register('vatRate')}><option value="0.16">16%</option><option value="0.08">8%</option><option value="0">0% (Exempt)</option></select></div>
           </div>
           <div className="grid grid-cols-2 gap-3">

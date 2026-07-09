@@ -97,7 +97,7 @@ export default function Settings() {
               value={financier}
               onChange={(e) => setFinancier(e.target.value)}
             />
-            <button type="submit" className="btn-primary whitespace-nowrap" disabled={saving === 'financier'}>
+            <button type="submit" className="btn-primary whitespace-nowrap" disabled={saving === 'financier' || !financier.trim()}>
               {saving === 'financier' ? <ButtonLoader /> : <FiPlus />} Add
             </button>
           </form>
@@ -132,7 +132,7 @@ export default function Settings() {
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
             />
-            <button type="submit" className="btn-primary whitespace-nowrap" disabled={saving === 'branch'}>
+            <button type="submit" className="btn-primary whitespace-nowrap" disabled={saving === 'branch' || !branch.trim()}>
               {saving === 'branch' ? <ButtonLoader /> : <FiPlus />} Add
             </button>
           </form>
