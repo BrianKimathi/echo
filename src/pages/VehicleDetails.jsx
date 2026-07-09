@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { FiArrowLeft, FiEdit2, FiUpload, FiTrash2, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import {
+  FiArrowLeft, FiEdit2, FiUpload, FiTrash2, FiChevronLeft, FiChevronRight,
+  FiPackage, FiCheckCircle, FiTruck, FiShoppingCart, FiArrowRight, FiAlertCircle,
+} from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import AppLayout from '../components/layouts/AppLayout'
 import PageHeader from '../components/ui/PageHeader'
@@ -12,7 +15,7 @@ import { ButtonLoader, SectionLoader } from '../components/ui/Spinner'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../contexts/AuthContext'
 import { inventoryService, MAX_VEHICLE_IMAGES, MIN_VEHICLE_IMAGES } from '../services'
-import { VEHICLE_MODELS, VEHICLE_COLORS, VEHICLE_STATUS } from '../constants'
+import { VEHICLE_MODELS, VEHICLE_COLORS, VEHICLE_PROCUREMENT_STAGES } from '../constants'
 import { formatCurrency, formatDate } from '../utils/helpers'
 import { can } from '../utils/permissions'
 
@@ -24,12 +27,7 @@ export default function VehicleDetails() {
   const [uploading, setUploading] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
   const [lightbox, setLightbox] = useState(null)
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { isSubmitting },
-  } = useForm()
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm()
 
   if (loading || !data) {
     return (
@@ -43,6 +41,13 @@ export default function VehicleDetails() {
   const canManage = can.manageInventory(profile?.role)
   const images = vehicle.images || (vehicle.image ? [vehicle.image] : [])
 
+  // Stock calculations
+  const totalQty = Number(vehicle.quantity || 1)
+  const reservedQty = Number(vehicle.reservedQty || 0)
+  const soldQty = Number(vehicle.soldQty || 0)
+  const deliveredQty = Number(vehicle.deliveredQty || 0)
+  const availableQty = Math.max(totalQty - reservedQty - soldQty - deliveredQty, 0)
+
   const openEdit = () => {
     reset(vehicle)
     setEditOpen(true)
@@ -50,9 +55,26 @@ export default function VehicleDetails() {
 
   const onSubmit = async (formData) => {
     try {
-      await inventoryService.update(id, { ...formData, price: Number(formData.price) })
+      await inventoryService.update(id, {
+        ...formData,
+        price: Number(formData.price),
+        quantity: Number(formData.quantity || 1),
+      })
       toast.success('Vehicle updated')
       setEditOpen(false)
+      reload()
+    } catch (e) {
+      toast.error(e.message)
+    }
+  }
+
+  const advanceNTSA = async () => {
+    const idx = VEHICLE_PROCUREMENT_STAGES.indexOf(vehicle.status)
+    if (idx < 0 || idx >= VEHICLE_PROCUREMENT_STAGES.length - 1) return
+    const next = VEHICLE_PROCUREMENT_STAGES[idx + 1]
+    try {
+      await inventoryService.update(id, { status: next })
+      toast.success(`Marked as ${next}`)
       reload()
     } catch (e) {
       toast.error(e.message)
@@ -95,6 +117,17 @@ export default function VehicleDetails() {
   const prevImage = () => setActiveImage((i) => (i === 0 ? images.length - 1 : i - 1))
   const nextImage = () => setActiveImage((i) => (i === images.length - 1 ? 0 : i + 1))
 
+  const stockCards = [
+    { label: 'Total Stock', value: totalQty, icon: FiPackage, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { label: 'Available', value: availableQty, icon: FiCheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Reserved', value: reservedQty, icon: FiAlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Sold', value: soldQty, icon: FiShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Delivered', value: deliveredQty, icon: FiTruck, color: 'text-primary', bg: 'bg-primary/5' },
+  ]
+
+  const ntsaIdx = VEHICLE_PROCUREMENT_STAGES.indexOf(vehicle.status)
+  const canAdvanceNTSA = canManage && ntsaIdx >= 0 && ntsaIdx < VEHICLE_PROCUREMENT_STAGES.length - 1
+
   return (
     <AppLayout>
       <Link to="/inventory" className="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-primary">
@@ -105,10 +138,52 @@ export default function VehicleDetails() {
         subtitle={`Added ${formatDate(vehicle.createdAt)}`}
         actions={canManage && (
           <button className="btn-outline" onClick={openEdit}>
-            <FiEdit2 /> Edit
+            <FiEdit2 /> Edit Details
           </button>
         )}
       />
+
+      {/* Stock Summary */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {stockCards.map((c) => (
+          <div key={c.label} className={`rounded-xl ${c.bg} p-4 text-center`}>
+            <c.icon size={20} className={`mx-auto mb-1 ${c.color}`} />
+            <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
+            <p className="mt-0.5 text-xs font-medium text-slate-500">{c.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* NTSA Procurement Status */}
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-slate-400">NTSA / Procurement Status</p>
+            <Badge variant={statusVariant(vehicle.status)} className="mt-1">{vehicle.status}</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {VEHICLE_PROCUREMENT_STAGES.map((stage, i) => (
+              <div key={stage} className="flex items-center gap-2">
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  vehicle.status === stage
+                    ? 'bg-primary text-white'
+                    : ntsaIdx > i ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'
+                }`}>
+                  {stage}
+                </span>
+                {i < VEHICLE_PROCUREMENT_STAGES.length - 1 && (
+                  <FiArrowRight size={12} className="text-slate-300" />
+                )}
+              </div>
+            ))}
+            {canAdvanceNTSA && (
+              <button className="btn-primary ml-2" onClick={advanceNTSA} title={`Advance to ${VEHICLE_PROCUREMENT_STAGES[ntsaIdx + 1]}`}>
+                <FiArrowRight size={14} /> Advance
+              </button>
+            )}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Image Gallery */}
@@ -124,16 +199,10 @@ export default function VehicleDetails() {
                 />
                 {images.length > 1 && (
                   <>
-                    <button
-                      onClick={prevImage}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow hover:bg-white"
-                    >
+                    <button onClick={prevImage} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow hover:bg-white">
                       <FiChevronLeft size={18} />
                     </button>
-                    <button
-                      onClick={nextImage}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow hover:bg-white"
-                    >
+                    <button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow hover:bg-white">
                       <FiChevronRight size={18} />
                     </button>
                     <span className="absolute bottom-2 right-2 rounded-full bg-slate-900/60 px-2 py-0.5 text-xs text-white">
@@ -146,23 +215,17 @@ export default function VehicleDetails() {
               <div className="flex h-72 w-full flex-col items-center justify-center gap-2 text-slate-400">
                 <FiUpload size={32} />
                 <p className="text-sm">No images yet</p>
-                {canManage && MIN_VEHICLE_IMAGES > 0 && (
-                  <p className="text-xs">At least {MIN_VEHICLE_IMAGES} image required</p>
-                )}
               </div>
             )}
           </div>
 
-          {/* Thumbnails + Upload */}
           <div className="mt-3 flex flex-wrap gap-2">
             {images.map((img, i) => (
               <div key={i} className="group relative h-16 w-16">
                 <img
                   src={img}
                   alt={`thumb ${i + 1}`}
-                  className={`h-16 w-16 cursor-pointer rounded-lg object-cover border-2 ${
-                    i === activeImage ? 'border-primary' : 'border-transparent'
-                  }`}
+                  className={`h-16 w-16 cursor-pointer rounded-lg object-cover border-2 ${i === activeImage ? 'border-primary' : 'border-transparent'}`}
                   onClick={() => setActiveImage(i)}
                 />
                 {canManage && (
@@ -176,22 +239,13 @@ export default function VehicleDetails() {
                 )}
               </div>
             ))}
-
             {canManage && images.length < MAX_VEHICLE_IMAGES && (
               <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 text-slate-400 hover:border-primary hover:text-primary">
-                {uploading ? (
-                  <span className="text-xs">…</span>
-                ) : (
-                  <>
-                    <FiUpload size={18} />
-                    <span className="text-[10px]">Add</span>
-                  </>
-                )}
+                {uploading ? <span className="text-xs">…</span> : <><FiUpload size={18} /><span className="text-[10px]">Add</span></>}
                 <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
               </label>
             )}
           </div>
-
           {canManage && (
             <p className="mt-2 text-xs text-slate-400">
               {images.length} of {MAX_VEHICLE_IMAGES} images {MIN_VEHICLE_IMAGES > 0 ? `(min ${MIN_VEHICLE_IMAGES})` : '(optional)'}
@@ -208,16 +262,16 @@ export default function VehicleDetails() {
               <p className="text-lg font-bold text-primary">{formatCurrency(vehicle.price)}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Status</p>
-              <Badge variant={statusVariant(vehicle.status)}>{vehicle.status}</Badge>
-            </div>
-            <div>
               <p className="text-xs text-slate-400">Color</p>
-              <p className="text-slate-700">{vehicle.color}</p>
+              <p className="text-slate-700">{vehicle.color || '-'}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Chassis Number</p>
               <p className="font-mono text-xs text-slate-600">{vehicle.chassisNumber || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Engine Number</p>
+              <p className="font-mono text-xs text-slate-600">{vehicle.engineNumber || '-'}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Battery Serial</p>
@@ -228,8 +282,16 @@ export default function VehicleDetails() {
               <p className="font-mono text-xs text-slate-600">{vehicle.motorSerial || '-'}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Engine Number</p>
-              <p className="font-mono text-xs text-slate-600">{vehicle.engineNumber || '-'}</p>
+              <p className="text-xs text-slate-400">Registration No.</p>
+              <p className="font-mono text-xs text-slate-600">{vehicle.registrationNo || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Date Received</p>
+              <p className="text-xs text-slate-600">{vehicle.dateReceivedFromFactory ? formatDate(vehicle.dateReceivedFromFactory) : '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">NTSA Booking Date</p>
+              <p className="text-xs text-slate-600">{vehicle.ntsaBookingDate ? formatDate(vehicle.ntsaBookingDate) : '-'}</p>
             </div>
           </div>
         </Card>
@@ -237,14 +299,12 @@ export default function VehicleDetails() {
 
       {/* Lightbox */}
       {lightbox && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-4"
-          onClick={() => setLightbox(null)}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-4" onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="full" className="max-h-[90vh] max-w-[90vw] rounded-xl object-contain" />
         </div>
       )}
 
+      {/* Edit Modal */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -277,14 +337,16 @@ export default function VehicleDetails() {
             </select>
           </div>
           <div>
-            <label className="label">Status</label>
-            <select className="input" {...register('status')}>
-              {VEHICLE_STATUS.map((s) => <option key={s}>{s}</option>)}
-            </select>
+            <label className="label">Quantity / Stock</label>
+            <input type="number" className="input" {...register('quantity', { required: 'Required', min: 1 })} />
           </div>
           <div>
             <label className="label">Chassis Number</label>
             <input className="input" {...register('chassisNumber')} />
+          </div>
+          <div>
+            <label className="label">Engine Number</label>
+            <input className="input" {...register('engineNumber')} />
           </div>
           <div>
             <label className="label">Battery Serial</label>
@@ -295,8 +357,16 @@ export default function VehicleDetails() {
             <input className="input" {...register('motorSerial')} />
           </div>
           <div>
-            <label className="label">Engine Number</label>
-            <input className="input" {...register('engineNumber')} />
+            <label className="label">Registration No.</label>
+            <input className="input" {...register('registrationNo')} />
+          </div>
+          <div>
+            <label className="label">Date Received From Factory</label>
+            <input type="date" className="input" {...register('dateReceivedFromFactory')} />
+          </div>
+          <div>
+            <label className="label">NTSA Booking Date</label>
+            <input type="date" className="input" {...register('ntsaBookingDate')} />
           </div>
         </form>
       </Modal>

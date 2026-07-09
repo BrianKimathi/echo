@@ -1,6 +1,6 @@
 import { create, getAll, getById, updateById, removeById, textSearch } from './dataService'
 import { inventoryService } from './inventoryService'
-import { VAT_RATE, VEHICLE_ASSIGNABLE_STATUS } from '../constants'
+import { VAT_RATE } from '../constants'
 
 const PATH = 'sales'
 const SEARCH_FIELDS = ['customerId', 'vehicleId', 'salesAgent', 'status', 'paymentMethod', 'invoiceNumber', 'registrationNo', 'branch']
@@ -62,16 +62,26 @@ export const saleService = {
   },
 
   /**
-   * Assign a (NTSA-cleared) unit to the customer. Reserves the vehicle and
-   * moves the sale to "Unit Assigned".
+   * Assign a unit to the customer. Checks available stock and reserves it.
+   * Moves the sale to "Unit Assigned".
    */
   assignUnit: async (saleId, vehicleId) => {
     const vehicle = await inventoryService.getById(vehicleId)
-    if (vehicle && !VEHICLE_ASSIGNABLE_STATUS.includes(vehicle.status)) {
-      throw new Error(`Vehicle must be NTSA Cleared before assignment (currently ${vehicle.status})`)
-    }
+    if (!vehicle) throw new Error('Vehicle not found')
+    // Throws if no available stock
+    await inventoryService.reserveUnit(vehicleId, vehicle)
     await updateById(PATH, saleId, { vehicleId, status: 'Unit Assigned', unitAssignedAt: Date.now() })
-    if (vehicle) await inventoryService.update(vehicleId, { status: 'Reserved' })
+  },
+
+  /**
+   * Unassign a unit from a sale. Returns the sale to previous status and releases the reserved stock.
+   */
+  unassignUnit: async (saleId, vehicleId, prevStatus = 'Payment Confirmed') => {
+    if (vehicleId) {
+      const vehicle = await inventoryService.getById(vehicleId)
+      if (vehicle) await inventoryService.releaseUnit(vehicleId, vehicle)
+    }
+    await updateById(PATH, saleId, { vehicleId: '', status: prevStatus, unitAssignedAt: null })
   },
 
   /**
@@ -102,23 +112,23 @@ export const saleService = {
 
   /**
    * Documents verified — move to NTSA Transfer stage.
+   * Also marks the vehicle batch as NTSA Cleared automatically.
    */
-  verifyDocuments: async (saleId) => {
+  verifyDocuments: async (saleId, vehicleId) => {
     await updateById(PATH, saleId, { status: 'NTSA Transfer', documentsVerifiedAt: Date.now() })
+    if (vehicleId) await inventoryService.clearNTSA(vehicleId)
   },
 
   /**
-   * Tuk-tuk dispatched / delivered to the customer. Vehicle → Delivered,
-   * sale → Dispatched. Warranty details are captured here and forwarded
-   * to the spares department for future claims.
+   * Tuk-tuk dispatched / delivered to the customer.
+   * Moves one unit from Sold → Delivered in the vehicle batch.
    */
   dispatch: async (saleId, vehicleId, details = {}) => {
-    await updateById(PATH, saleId, {
-      status: 'Dispatched',
-      dispatchedAt: Date.now(),
-      ...details,
-    })
-    if (vehicleId) await inventoryService.update(vehicleId, { status: 'Delivered' })
+    await updateById(PATH, saleId, { status: 'Dispatched', dispatchedAt: Date.now(), ...details })
+    if (vehicleId) {
+      const vehicle = await inventoryService.getById(vehicleId)
+      if (vehicle) await inventoryService.markDeliveredUnit(vehicleId, vehicle)
+    }
   },
 
   /**
@@ -141,6 +151,11 @@ export const saleService = {
       status: 'Invoice Raised',
     }
     await updateById(PATH, saleId, payload)
+    // Invoice raised = unit is now Sold (move from Reserved → Sold in batch)
+    if (sale.vehicleId) {
+      const vehicle = await inventoryService.getById(sale.vehicleId)
+      if (vehicle) await inventoryService.markSoldUnit(sale.vehicleId, vehicle)
+    }
     return { ...sale, ...payload }
   },
 }

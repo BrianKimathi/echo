@@ -44,9 +44,6 @@ export const INQUIRY_STATUS = ['New', 'Contacted', 'Negotiating', 'Converted', '
 // A vehicle can only be assigned to a customer once it is "NTSA Cleared".
 // ---------------------------------------------------------------------------
 export const VEHICLE_PROCUREMENT_STAGES = [
-  'Ordered',
-  'Order Received',
-  'Released',
   'Received',
   'NTSA Booking',
   'NTSA Cleared',
@@ -57,8 +54,7 @@ export const VEHICLE_SALE_STAGES = ['Reserved', 'Sold', 'Delivered']
 export const VEHICLE_STATUS = [...VEHICLE_PROCUREMENT_STAGES, ...VEHICLE_SALE_STAGES]
 
 // Vehicles in these statuses are available to be assigned to a customer.
-// A vehicle can be allocated while NTSA is still processing it.
-export const VEHICLE_ASSIGNABLE_STATUS = ['NTSA Booking', 'NTSA Cleared']
+export const VEHICLE_ASSIGNABLE_STATUS = ['Received', 'NTSA Booking', 'NTSA Cleared']
 
 export const VEHICLE_MODELS = ['EcoRider Pro', 'CargoMax X1', 'CityCab Deluxe', 'FleetRunner S', 'Hauler HD', 'Rhinggo tuktuk', 'Rhinggo bike']
 

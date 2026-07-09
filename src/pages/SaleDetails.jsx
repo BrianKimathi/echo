@@ -73,7 +73,10 @@ export default function SaleDetails() {
       sale,
       customer: customers.find((c) => c.id === sale?.customerId),
       vehicle: vehicles.find((v) => v.id === sale?.vehicleId),
-      assignableVehicles: vehicles.filter((v) => VEHICLE_ASSIGNABLE_STATUS.includes(v.status)),
+      assignableVehicles: vehicles.filter((v) =>
+        VEHICLE_ASSIGNABLE_STATUS.includes(v.status) &&
+        (Number(v.quantity || 1) - Number(v.reservedQty || 0) - Number(v.soldQty || 0) - Number(v.deliveredQty || 0) > 0)
+      ),
       payments,
       credit,
       settings,
@@ -196,9 +199,13 @@ export default function SaleDetails() {
       await paymentService.confirm(payment.id)
       const updatedPayments = payments.map(p => p.id === payment.id ? { ...p, confirmed: true } : p)
       const totalConfirmed = updatedPayments.filter(p => p.confirmed).reduce((sum, p) => sum + p.amount, 0)
-      if (isCash && totalConfirmed >= sale.price) {
+      if (totalConfirmed >= sale.price) {
         await saleService.confirmCashPayment(id)
-        toast.success('Full payment confirmed. Ready to assign a unit.')
+        if (sale.vehicleId) {
+          const vehicle = await inventoryService.getById(sale.vehicleId)
+          if (vehicle) await inventoryService.markSoldUnit(sale.vehicleId, vehicle)
+        }
+        toast.success('Full payment confirmed. Unit marked as Sold.')
       } else {
         toast.success(`Payment confirmed. Paid: ${formatCurrency(totalConfirmed)}`)
       }
@@ -209,28 +216,115 @@ export default function SaleDetails() {
   }
 
   const printReceipt = (payment) => {
-    const w = window.open('', '_blank', 'width=400,height=600')
+    const price = Number(sale.price || 0)
+    const rate = sale.vatRate ?? VAT_RATE
+    const vat = computeVat(price, rate)
+    const grandTotal = price + vat
+    // Build rows for all confirmed payments up to and including this one
+    const confirmedPayments = payments.filter((p) => p.confirmed)
+    const cumulativePaid = confirmedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    const allPaidIncThisOne = confirmedPayments.some((p) => p.id === payment.id)
+      ? cumulativePaid
+      : cumulativePaid + Number(payment.amount || 0)
+    const balance = Math.max(grandTotal - allPaidIncThisOne, 0)
+
+    // Build payment history rows HTML
+    const paymentRows = payments.map((p, i) => `
+      <tr style="background:${p.id === payment.id ? '#f0fdf4' : 'transparent'}">
+        <td>${i + 1}</td>
+        <td>${formatDate(p.paymentDate || p.createdAt)}</td>
+        <td>${p.paymentMethod}</td>
+        <td>${p.reference || '-'}</td>
+        <td style="text-align:right;font-weight:bold">${formatCurrency(p.amount)}</td>
+        <td style="text-align:center">${p.confirmed ? '✓' : 'Pending'}</td>
+      </tr>`).join('')
+
+    const w = window.open('', '_blank', 'width=800,height=900')
     w.document.write(`
       <html><head><title>Receipt ${payment.receiptNumber}</title>
       <style>
-        body{font-family:monospace;padding:20px;font-size:12px}
-        h2{margin:0;text-align:center;color:#0B6E4F}
-        hr{border:none;border-top:1px dashed #999;margin:10px 0}
-        .row{display:flex;justify-content:space-between;margin:4px 0}
+        @page { margin: 10mm; }
+        body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 14px; color: #000; padding: 20px; }
+        .header { display: flex; align-items: center; margin-bottom: 5px; }
+        .logo-box { width: 180px; height: 140px; background-color: #5cb85c; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; margin-right: 20px; }
+        .logo-d { font-size: 60px; font-weight: bold; color: #ff3333; line-height: 1; margin-bottom: 5px; }
+        .logo-text { font-size: 20px; font-weight: bold; letter-spacing: 1px; }
+        .logo-sub { font-size: 11px; font-weight: bold; }
+        .company-info { flex: 1; text-align: center; color: #00B050; }
+        .company-info h1 { font-size: 28px; margin: 0 0 10px 0; font-weight: bold; }
+        .company-info p { margin: 5px 0; font-size: 16px; font-weight: bold; }
+        .company-info .email { font-style: italic; text-decoration: underline; }
+        .green-line { height: 4px; background-color: #00B050; margin-bottom: 20px; }
+        .bold { font-weight: bold; }
+        .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
+        .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+        th { background: #000; color: #fff; padding: 8px; text-align: left; }
+        td { padding: 7px 8px; border-bottom: 1px solid #e2e8f0; }
+        .highlight { background: #f0fdf4; }
+        .summary-box { background: #8C8C8C; padding: 10px 16px; font-weight: bold; font-size: 15px; margin-top: 20px; display: flex; justify-content: space-between; }
       </style></head><body>
-      <h2>Tuk-Tuk e-Mobility</h2>
-      <p style="text-align:center">Official Receipt</p>
-      <hr>
-      <div class="row"><span>Receipt No:</span><b>${payment.receiptNumber}</b></div>
-      <div class="row"><span>Date:</span><b>${formatDate(payment.paymentDate)}</b></div>
-      <div class="row"><span>Customer:</span><b>${customer?.name || '-'}</b></div>
-      <div class="row"><span>Vehicle:</span><b>${vehicle?.model || '-'}</b></div>
-      <hr>
-      <div class="row"><span>Amount Paid:</span><b>${formatCurrency(payment.amount)}</b></div>
-      <div class="row"><span>Method:</span><b>${payment.paymentMethod}</b></div>
-      <div class="row"><span>Reference:</span><b>${payment.reference || '-'}</b></div>
-      <hr>
-      <p style="text-align:center">Thank you for your business!</p>
+
+      <div class="header">
+        <div class="logo-box">
+          <div class="logo-d">D</div>
+          <div class="logo-text">DONPAV</div>
+          <div class="logo-sub">ELECTRIC LTD</div>
+        </div>
+        <div class="company-info">
+          <h1>DONPAV ELECTRIC LIMITED</h1>
+          <p>Authorised Dealers of Rhinggo electric tuk tuk and motorbikes</p>
+          <p>Location: Kisauni-Majengo-Diani-Kisumu</p>
+          <p>Tel: 0721 904 506 – 0720 320 233 – 0719 403 028</p>
+          <p class="email">Email: donrhinggo@gmail.com</p>
+        </div>
+      </div>
+      <div class="green-line"></div>
+
+      <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+        <div style="font-size:18px;font-weight:bold">OFFICIAL RECEIPT</div>
+        <div style="text-align:right;color:#64748b">
+          <div>${payment.receiptNumber || ''}</div>
+          <div>Date: ${formatDate(payment.paymentDate || payment.createdAt)}</div>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="row"><span class="bold">Customer:</span><span>${customer?.name || '-'}</span></div>
+        <div class="row"><span class="bold">ID No:</span><span>${customer?.idNumber || '-'}</span></div>
+        <div class="row"><span class="bold">Vehicle:</span><span>${vehicle?.model || '-'} (${vehicle?.color || ''})</span></div>
+        <div class="row"><span class="bold">Chassis No:</span><span>${vehicle?.chassisNumber || '-'}</span></div>
+        <div class="row"><span class="bold">Payment Method:</span><span>${sale.paymentMethod}</span></div>
+      </div>
+
+      <div class="box" style="background:#f0fdf4;border-color:#16a34a">
+        <p style="font-weight:bold;font-size:15px;margin-bottom:8px">This Payment</p>
+        <div class="row"><span>Amount Paid:</span><span style="font-weight:bold;font-size:16px">${formatCurrency(payment.amount)}</span></div>
+        <div class="row"><span>Method:</span><span>${payment.paymentMethod}</span></div>
+        <div class="row"><span>Reference:</span><span>${payment.reference || '-'}</span></div>
+      </div>
+
+      <p style="font-weight:bold;margin-top:20px;margin-bottom:6px">All Payments To Date</p>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Date</th><th>Method</th><th>Reference</th><th style="text-align:right">Amount</th><th style="text-align:center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paymentRows}
+        </tbody>
+      </table>
+
+      <div style="max-width:400px;margin-left:auto;margin-top:20px">
+        <div class="row"><span>Vehicle Price</span><span>${formatCurrency(price)}</span></div>
+        ${vat > 0 ? `<div class="row"><span>VAT (${(rate * 100).toFixed(0)}%)</span><span>${formatCurrency(vat)}</span></div>` : ''}
+        <div class="row bold"><span>Grand Total</span><span>${formatCurrency(grandTotal)}</span></div>
+        <div class="row" style="color:#16a34a"><span>Total Paid</span><span>- ${formatCurrency(allPaidIncThisOne)}</span></div>
+        <div class="summary-box"><span>Balance Due</span><span>KSH ${formatCurrency(balance).replace('KSH ', '')}</span></div>
+      </div>
+
+      <p style="margin-top:30px;text-align:center;color:#64748b">Thank you for your business!</p>
       </body></html>`)
     w.document.close()
     w.print()
@@ -260,6 +354,10 @@ export default function SaleDetails() {
       }
       // Keep the sale status in sync with the loan stage.
       await saleService.setLoanStage(id, formData.status)
+      if (formData.status === 'Loan Accepted' && sale.vehicleId) {
+        const vehicle = await inventoryService.getById(sale.vehicleId)
+        if (vehicle) await inventoryService.markSoldUnit(sale.vehicleId, vehicle)
+      }
       toast.success('Loan application updated')
       setCreditOpen(false)
       reload()
@@ -335,6 +433,20 @@ export default function SaleDetails() {
       await saleService.assignUnit(id, formData.vehicleId)
       toast.success('Unit assigned to customer')
       setAssignOpen(false)
+      reload()
+    } catch (e) {
+      toast.error(e.message)
+    }
+  }
+
+  const handleUnassign = async () => {
+    try {
+      const totalPaid = payments.filter(p => p.confirmed).reduce((sum, p) => sum + p.amount, 0)
+      const prevStatus = isCredit
+        ? (credit?.status === 'Loan Accepted' ? 'Loan Accepted' : (credit?.status || 'Loan Requested'))
+        : (totalPaid >= sale.price ? 'Payment Confirmed' : 'Payment Pending')
+      await saleService.unassignUnit(id, sale.vehicleId, prevStatus)
+      toast.success('Unit unassigned from sale')
       reload()
     } catch (e) {
       toast.error(e.message)
@@ -440,7 +552,7 @@ export default function SaleDetails() {
   // ----- Document verification -----
   const verifyDocuments = async () => {
     try {
-      await saleService.verifyDocuments(id)
+      await saleService.verifyDocuments(id, sale.vehicleId)
       toast.success('Documents verified. Ready for NTSA transfer.')
       reload()
     } catch (e) {
@@ -867,18 +979,30 @@ export default function SaleDetails() {
             </div>
           )}
 
-          {/* 3. Payment confirmed → assign unit */}
-          {isCash && sale.status === 'Payment Confirmed' && (
-            <div className="rounded-xl bg-green-50 p-6 text-center">
+          {/* 3. Payment confirmed / active sale → assign unit or show unassign */}
+          {!sale.vehicleId && !['Inquiry', 'Dispatched', 'Loan Rejected'].includes(sale.status) && (
+            <div className="rounded-xl bg-green-50/50 border border-green-100 p-6 text-center mb-6">
               <FiCheckCircle size={32} className="mx-auto text-green-500" />
-              <p className="mt-2 text-sm text-green-700">Payment confirmed. Assign a unit to the customer.</p>
+              <p className="mt-2 text-sm text-green-700 font-medium">Assign an inventory unit to this customer.</p>
               {canManage && <button className="btn-primary mt-4" onClick={openAssign}><FiTruck /> Assign Unit</button>}
+            </div>
+          )}
+
+          {sale.vehicleId && !['Dispatched'].includes(sale.status) && (
+            <div className="rounded-xl bg-slate-50 p-6 text-center mb-6 border border-slate-100">
+              <FiTruck size={32} className="mx-auto text-slate-400" />
+              <p className="mt-2 text-sm text-slate-600 font-medium">Unit is assigned to this sale.</p>
+              {canManage && (
+                <button className="btn-outline mt-4 border-red-200 text-red-600 hover:bg-red-50" onClick={handleUnassign}>
+                  <FiTrash2 /> Unassign Unit
+                </button>
+              )}
             </div>
           )}
 
           {/* Credit flow — loan status & updates */}
           {isCredit && ['Loan Requested', 'Loan Submitted', 'Loan Accepted', 'Loan Rejected'].includes(sale.status) && (
-            <div className="space-y-4">
+            <div className="space-y-4 mb-6">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 p-4">
                 <div>
                   <p className="font-medium text-slate-700">{credit?.financier || 'No financier'}</p>
@@ -887,14 +1011,6 @@ export default function SaleDetails() {
                 <Badge variant={statusVariant(sale.status)}>{sale.status}</Badge>
                 {canManage && <button className="btn-outline" onClick={openCredit}><FiFileText /> Update Loan</button>}
               </div>
-
-              {/* Accepted → assign unit */}
-              {sale.status === 'Loan Accepted' && canManage && (
-                <div className="rounded-xl bg-green-50 p-4 text-center">
-                  <p className="text-sm text-green-700">Loan accepted. Assign a unit to the customer.</p>
-                  <button className="btn-primary mt-3" onClick={openAssign}><FiTruck /> Assign Unit</button>
-                </div>
-              )}
               {sale.status === 'Loan Rejected' && (
                 <div className="rounded-xl bg-red-50 p-4 text-center text-sm text-red-600">Loan rejected. This sale cannot proceed.</div>
               )}

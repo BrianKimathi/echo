@@ -13,7 +13,7 @@ import { ButtonLoader } from '../components/ui/Spinner'
 import { useAsyncList } from '../hooks/useAsync'
 import { useAuth } from '../contexts/AuthContext'
 import { inventoryService, MAX_VEHICLE_IMAGES, MIN_VEHICLE_IMAGES } from '../services'
-import { VEHICLE_MODELS, VEHICLE_COLORS, VEHICLE_STATUS, VEHICLE_PROCUREMENT_STAGES } from '../constants'
+import { VEHICLE_MODELS, VEHICLE_COLORS, VEHICLE_PROCUREMENT_STAGES } from '../constants'
 import { formatCurrency, formatDate } from '../utils/helpers'
 import { can } from '../utils/permissions'
 
@@ -40,7 +40,7 @@ export default function Inventory() {
 
   const openCreate = () => {
     setEditing(null)
-    reset({ model: '', price: '', color: '', batterySerial: '', motorSerial: '', engineNumber: '', chassisNumber: '', registrationNo: '', status: 'Ordered', dateReceivedFromFactory: '', ntsaBookingDate: '' })
+    reset({ model: '', price: '', color: '', batterySerial: '', motorSerial: '', engineNumber: '', chassisNumber: '', registrationNo: '', status: 'Received', dateReceivedFromFactory: '', ntsaBookingDate: '', quantity: 1 })
     setPendingFiles([])
     setPendingPreviews([])
     setModalOpen(true)
@@ -95,7 +95,7 @@ export default function Inventory() {
         return
       }
       setUploading(true)
-      const payload = { ...data, price: Number(data.price) }
+      const payload = { ...data, price: Number(data.price), quantity: Number(data.quantity || 1) }
       if (editing) {
         const existing = vehicleImages(editing)
         let images = [...existing]
@@ -182,7 +182,7 @@ export default function Inventory() {
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {['All', ...VEHICLE_STATUS].map((s) => (
+        {['All', ...VEHICLE_PROCUREMENT_STAGES].map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
@@ -211,10 +211,10 @@ export default function Inventory() {
         <DataTable
           columns={[
             { key: 'model', label: 'Vehicle' },
-            { key: 'price', label: 'Price' },
+            { key: 'price', label: 'Price (KSH)' },
             { key: 'color', label: 'Color' },
+            { key: 'quantity', label: 'Stock' },
             { key: 'chassisNumber', label: 'Chassis' },
-            { key: 'status', label: 'Status' },
             { key: 'createdAt', label: 'Added' },
             { key: 'actions', label: '' },
           ]}
@@ -246,32 +246,13 @@ export default function Inventory() {
                 </td>
                 <td className="font-medium text-slate-700">{formatCurrency(v.price)}</td>
                 <td>{v.color}</td>
-                <td className="font-mono text-xs text-slate-500">{v.chassisNumber || '-'}</td>
                 <td>
-                  {canManage ? (
-                    <div className="flex items-center gap-1">
-                      <select
-                        value={v.status}
-                        onChange={(e) => changeStatus(v, e.target.value)}
-                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
-                      >
-                        {VEHICLE_STATUS.map((s) => <option key={s}>{s}</option>)}
-                      </select>
-                      {VEHICLE_PROCUREMENT_STAGES.indexOf(v.status) >= 0 &&
-                        VEHICLE_PROCUREMENT_STAGES.indexOf(v.status) < VEHICLE_PROCUREMENT_STAGES.length - 1 && (
-                          <button
-                            className="btn-ghost p-1.5 text-primary"
-                            title={`Advance to ${VEHICLE_PROCUREMENT_STAGES[VEHICLE_PROCUREMENT_STAGES.indexOf(v.status) + 1]}`}
-                            onClick={() => advanceStage(v)}
-                          >
-                            <FiArrowRight size={15} />
-                          </button>
-                        )}
-                    </div>
-                  ) : (
-                    <Badge variant={statusVariant(v.status)}>{v.status}</Badge>
-                  )}
+                  <span className="font-bold text-slate-700">{v.quantity ?? 1}</span>
+                  <span className="ml-1 text-xs text-slate-400">
+                    ({Math.max((v.quantity ?? 1) - (v.reservedQty || 0) - (v.soldQty || 0) - (v.deliveredQty || 0), 0)} avail)
+                  </span>
                 </td>
+                <td className="font-mono text-xs text-slate-500">{v.chassisNumber || '-'}</td>
                 <td className="text-slate-500">{formatDate(v.createdAt)}</td>
                 <td>
                   <div className="flex justify-end gap-1">
@@ -331,10 +312,8 @@ export default function Inventory() {
             </select>
           </div>
           <div>
-            <label className="label">Status</label>
-            <select className="input" {...register('status')}>
-              {VEHICLE_STATUS.map((s) => <option key={s}>{s}</option>)}
-            </select>
+            <label className="label">Quantity / Stock</label>
+            <input type="number" className="input" {...register('quantity', { required: 'Required', min: 1 })} defaultValue={1} />
           </div>
           <div>
             <label className="label">Chassis Number</label>
