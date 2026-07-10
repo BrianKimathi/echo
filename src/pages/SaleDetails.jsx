@@ -143,22 +143,57 @@ export default function SaleDetails() {
 
   // ----- Agree to proceed -----
   const openAgree = () => {
-    agreeForm.reset({
+    const existingAccs = sale.accessories || {}
+    const resetObj = {
       paymentMethod: sale.paymentMethod || 'Cash',
       price: sale.price > 0 ? sale.price : '',
       branch: sale.branch || branches[0] || '',
       units: sale.units || 1,
+    }
+    const accList = data?.accessories || []
+    accList.forEach((acc) => {
+      resetObj[`qty_${acc.id}`] = existingAccs[acc.id]?.qty || 0
+      resetObj[`inc_${acc.id}`] = existingAccs[acc.id]?.included || false
     })
+    agreeForm.reset(resetObj)
     setAgreeOpen(true)
   }
 
   const doAgree = async (formData) => {
     try {
+      // Process accessories
+      const accList = data?.accessories || []
+      const selectedAccessories = {}
+      let accessoriesTotal = 0
+      for (const acc of accList) {
+        const qty = Number(formData[`qty_${acc.id}`] || 0)
+        const included = formData[`inc_${acc.id}`] || false
+        if (qty > 0) {
+          const prevQty = sale.accessories?.[acc.id]?.qty || 0
+          if (qty > acc.stock && qty !== prevQty) {
+            throw new Error(`Insufficient stock for ${acc.name}. Available: ${acc.stock}`)
+          }
+          selectedAccessories[acc.id] = { id: acc.id, name: acc.name, price: acc.price, qty, included }
+          if (included) accessoriesTotal += acc.price * qty
+          const diff = qty - prevQty
+          if (diff !== 0) {
+            await accessoryService.update(acc.id, { stock: Math.max(acc.stock - diff, 0) })
+          }
+        } else {
+          const prevQty = sale.accessories?.[acc.id]?.qty || 0
+          if (prevQty > 0) {
+            await accessoryService.update(acc.id, { stock: acc.stock + prevQty })
+          }
+        }
+      }
+
       await saleService.agreeToProceed(id, {
         paymentMethod: formData.paymentMethod,
         price: formData.price,
         branch: formData.branch,
         units: formData.units || 1,
+        accessories: selectedAccessories,
+        accessoriesTotal,
       })
       // If credit, create the credit application record so documents can be uploaded.
       if (formData.paymentMethod === 'Credit' && !credit) {
@@ -169,7 +204,7 @@ export default function SaleDetails() {
           status: 'Loan Requested',
         })
       }
-      toast.success('Payment method captured')
+      toast.success('Payment method and accessories captured')
       setAgreeOpen(false)
       reload()
     } catch (e) {
@@ -1120,7 +1155,7 @@ export default function SaleDetails() {
           <Card className="lg:col-span-1">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold text-slate-700">Accessories Added</h3>
-              {canManage && sale.status === 'Pre-Delivery Service' && (
+              {canManage && sale.status !== 'Dispatched' && (
                 <button className="btn-ghost px-2 py-1 text-xs text-primary" onClick={openPreDelivery}>
                   Edit
                 </button>
@@ -1501,14 +1536,25 @@ export default function SaleDetails() {
       </Card>
 
       {/* Agree to Proceed Modal */}
-      <Modal open={agreeOpen} onClose={() => setAgreeOpen(false)} title="Agree to Proceed">
+      <Modal open={agreeOpen} onClose={() => setAgreeOpen(false)} title="Agree to Proceed & Select Accessories" size="lg">
         <form onSubmit={agreeForm.handleSubmit(doAgree)} className="space-y-4">
-          <div>
-            <label className="label">Payment Method</label>
-            <select className="input" {...agreeForm.register('paymentMethod', { required: 'Required' })}>
-              {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
-            </select>
-            {agreeForm.formState.errors.paymentMethod && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.paymentMethod.message}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Payment Method</label>
+              <select className="input" {...agreeForm.register('paymentMethod', { required: 'Required' })}>
+                {PAYMENT_METHODS.map((m) => <option key={m}>{m}</option>)}
+              </select>
+              {agreeForm.formState.errors.paymentMethod && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.paymentMethod.message}</p>}
+            </div>
+            <div>
+              <label className="label">Branch</label>
+              <select className="input" {...agreeForm.register('branch', { required: 'Branch is required' })}>
+                <option value="">Select branch</option>
+                {branches.map((b) => <option key={b}>{b}</option>)}
+              </select>
+              {agreeForm.formState.errors.branch && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.branch.message}</p>}
+              {branches.length === 0 && <p className="mt-1 text-xs text-amber-600">No branches configured. Add them in Settings.</p>}
+            </div>
           </div>
           {agreeForm.watch('paymentMethod') === 'Credit' && (
             <div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-700">
@@ -1516,25 +1562,98 @@ export default function SaleDetails() {
               Credit applications require supporting documents (National ID, KRA PIN, Driving License, Guarantor's Documents). You will be prompted to upload them after proceeding.
             </div>
           )}
-          <div>
-            <label className="label">Price per Unit (KSH)</label>
-            <input type="number" className="input" {...agreeForm.register('price', { required: 'Price is required', min: { value: 1, message: 'Price must be greater than 0' } })} placeholder="Enter sale price" />
-            {agreeForm.formState.errors.price && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.price.message}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Price per Unit (KSH)</label>
+              <input type="number" className="input" {...agreeForm.register('price', { required: 'Price is required', min: { value: 1, message: 'Price must be greater than 0' } })} placeholder="Enter sale price" />
+              {agreeForm.formState.errors.price && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.price.message}</p>}
+            </div>
+            <div>
+              <label className="label">Number of Units</label>
+              <input type="number" className="input" {...agreeForm.register('units', { required: 'Units is required', min: { value: 1, message: 'Must be at least 1' } })} defaultValue={1} />
+              {agreeForm.formState.errors.units && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.units.message}</p>}
+            </div>
           </div>
-          <div>
-            <label className="label">Number of Units</label>
-            <input type="number" className="input" {...agreeForm.register('units', { required: 'Units is required', min: { value: 1, message: 'Must be at least 1' } })} defaultValue={1} />
-            {agreeForm.formState.errors.units && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.units.message}</p>}
+
+          {/* Accessories table inside Agree to Proceed */}
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Optional Charged Accessories</p>
+            <p className="text-xs text-slate-400 mb-3">Select accessories for this sale now so they are shown before confirming payment.</p>
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="min-w-full divide-y divide-slate-100 text-sm text-left">
+                <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-4 py-2">Accessory</th>
+                    <th className="px-4 py-2">Unit Price</th>
+                    <th className="px-4 py-2">In Stock</th>
+                    <th className="px-4 py-2 w-20">Qty</th>
+                    <th className="px-4 py-2 w-32 text-center">Bill to Invoice</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(data?.accessories || []).map((acc) => {
+                    const qty = Number(agreeForm.watch(`qty_${acc.id}`) || 0)
+                    return (
+                      <tr key={acc.id} className={qty > 0 ? 'bg-green-50/40' : ''}>
+                        <td className="px-4 py-2.5 font-medium text-slate-700">{acc.name}</td>
+                        <td className="px-4 py-2.5 text-slate-600">{formatCurrency(acc.price)}</td>
+                        <td className="px-4 py-2.5 text-slate-500">{acc.stock}</td>
+                        <td className="px-4 py-2.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={acc.stock + (sale.accessories?.[acc.id]?.qty || 0)}
+                            className="input px-2 py-1 text-center w-20"
+                            {...agreeForm.register(`qty_${acc.id}`)}
+                          />
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary mx-auto"
+                            {...agreeForm.register(`inc_${acc.id}`)}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Live price preview */}
+            {(() => {
+              const unitPrice = Number(agreeForm.watch('price') || 0)
+              const qty = Number(agreeForm.watch('units') || 1)
+              const accTotal = (data?.accessories || []).reduce((sum, acc) => {
+                const aQty = Number(agreeForm.watch(`qty_${acc.id}`) || 0)
+                const included = agreeForm.watch(`inc_${acc.id}`) || false
+                return sum + (included ? acc.price * aQty : 0)
+              }, 0)
+              const subtotal = unitPrice * qty + accTotal
+              const vat = computeVat(subtotal, sale.vatRate ?? VAT_RATE)
+              const total = subtotal + vat
+              return (
+                <div className="mt-3 rounded-xl bg-primary-50 border border-primary/20 p-3 text-sm space-y-1 text-left">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Vehicle ({qty} × {formatCurrency(unitPrice)})</span>
+                    <span>{formatCurrency(unitPrice * qty)}</span>
+                  </div>
+                  {accTotal > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Accessories (billed)</span>
+                      <span className="text-green-700 font-medium">{formatCurrency(accTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold text-slate-800 border-t border-primary/20 pt-1">
+                    <span>Estimate Total (excl. VAT)</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
-          <div>
-            <label className="label">Branch</label>
-            <select className="input" {...agreeForm.register('branch', { required: 'Branch is required' })}>
-              <option value="">Select branch</option>
-              {branches.map((b) => <option key={b}>{b}</option>)}
-            </select>
-            {agreeForm.formState.errors.branch && <p className="mt-1 text-xs text-red-500">{agreeForm.formState.errors.branch.message}</p>}
-            {branches.length === 0 && <p className="mt-1 text-xs text-amber-600">No branches configured. Add them in Settings.</p>}
-          </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" className="btn-outline" onClick={() => setAgreeOpen(false)}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={agreeForm.formState.isSubmitting}>{agreeForm.formState.isSubmitting && <ButtonLoader />} Proceed</button>
