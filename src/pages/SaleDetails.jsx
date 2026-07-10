@@ -443,13 +443,46 @@ export default function SaleDetails() {
 
   // ----- Assign unit -----
   const openAssign = () => {
-    assignForm.reset({ vehicleId: sale.vehicleId || '' })
+    const existingAccs = sale.accessories || {}
+    const resetObj = { vehicleId: sale.vehicleId || '' }
+    const accList = data?.accessories || []
+    accList.forEach((acc) => {
+      resetObj[`qty_${acc.id}`] = existingAccs[acc.id]?.qty || 0
+      resetObj[`inc_${acc.id}`] = existingAccs[acc.id]?.included || false
+    })
+    assignForm.reset(resetObj)
     setAssignOpen(true)
   }
 
   const doAssign = async (formData) => {
     try {
-      await saleService.assignUnit(id, formData.vehicleId)
+      // Process accessories
+      const accList = data?.accessories || []
+      const selectedAccessories = {}
+      let accessoriesTotal = 0
+      for (const acc of accList) {
+        const qty = Number(formData[`qty_${acc.id}`] || 0)
+        const included = formData[`inc_${acc.id}`] || false
+        if (qty > 0) {
+          const prevQty = sale.accessories?.[acc.id]?.qty || 0
+          if (qty > acc.stock && qty !== prevQty) {
+            throw new Error(`Insufficient stock for ${acc.name}. Available: ${acc.stock}`)
+          }
+          selectedAccessories[acc.id] = { id: acc.id, name: acc.name, price: acc.price, qty, included }
+          if (included) accessoriesTotal += acc.price * qty
+          const diff = qty - prevQty
+          if (diff !== 0) {
+            await accessoryService.update(acc.id, { stock: Math.max(acc.stock - diff, 0) })
+          }
+        } else {
+          const prevQty = sale.accessories?.[acc.id]?.qty || 0
+          if (prevQty > 0) {
+            await accessoryService.update(acc.id, { stock: acc.stock + prevQty })
+          }
+        }
+      }
+
+      await saleService.assignUnit(id, formData.vehicleId, { accessories: selectedAccessories, accessoriesTotal })
       toast.success('Unit assigned to customer')
       setAssignOpen(false)
       reload()
@@ -800,6 +833,8 @@ export default function SaleDetails() {
       <div class="notes-section">
         <p>Notes</p>
         <p>Looking forward for your business</p>
+        <p><span class="bold">BANK NAME:</span> FAMILY BANK</p>
+        <p><span class="bold">BRANCH:</span> DIGO ROAD, MOMBASA</p>
         <p><span class="bold">ACCOUNT NAME:</span> DONPAV ELECTRIC LTD-MANAGEMENT ACCOUNT</p>
         <p><span class="bold">ACCOUNT NO:</span> 092000034340</p>
         <p><span class="bold">BANK CODE:</span> 70</p>
@@ -1494,8 +1529,9 @@ export default function SaleDetails() {
       </Modal>
 
       {/* Assign Unit Modal */}
-      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Assign Unit">
-        <form onSubmit={assignForm.handleSubmit(doAssign)} className="space-y-4">
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Assign Unit & Accessories" size="lg">
+        <form onSubmit={assignForm.handleSubmit(doAssign)} className="space-y-5">
+          {/* Vehicle selector */}
           <div>
             <label className="label">Available Units (NTSA Cleared)</label>
             <select className="input" {...assignForm.register('vehicleId', { required: 'Required' })}>
@@ -1504,9 +1540,90 @@ export default function SaleDetails() {
             </select>
             {assignableVehicles.length === 0 && <p className="mt-1 text-xs text-amber-600">No NTSA-cleared units available.</p>}
           </div>
+
+          {/* Accessories table */}
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-700 mb-1">Optional Charged Accessories</p>
+            <p className="text-xs text-slate-400 mb-3">Select accessories to include with the unit. Tick "Bill to Invoice" to add their price to the customer's total.</p>
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="min-w-full divide-y divide-slate-100 text-sm text-left">
+                <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase">
+                  <tr>
+                    <th className="px-4 py-2">Accessory</th>
+                    <th className="px-4 py-2">Unit Price</th>
+                    <th className="px-4 py-2">In Stock</th>
+                    <th className="px-4 py-2 w-20">Qty</th>
+                    <th className="px-4 py-2 w-32 text-center">Bill to Invoice</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(data?.accessories || []).map((acc) => {
+                    const qty = Number(assignForm.watch(`qty_${acc.id}`) || 0)
+                    const included = assignForm.watch(`inc_${acc.id}`) || false
+                    return (
+                      <tr key={acc.id} className={qty > 0 ? 'bg-green-50/40' : ''}>
+                        <td className="px-4 py-2.5 font-medium text-slate-700">{acc.name}</td>
+                        <td className="px-4 py-2.5 text-slate-600">{formatCurrency(acc.price)}</td>
+                        <td className="px-4 py-2.5 text-slate-500">{acc.stock}</td>
+                        <td className="px-4 py-2.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={acc.stock + (sale.accessories?.[acc.id]?.qty || 0)}
+                            className="input px-2 py-1 text-center w-20"
+                            {...assignForm.register(`qty_${acc.id}`)}
+                          />
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary mx-auto"
+                            {...assignForm.register(`inc_${acc.id}`)}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Live price preview */}
+            {(() => {
+              const unitPrice = Number(sale.price || 0)
+              const qty = Number(sale.units || 1)
+              const accTotal = (data?.accessories || []).reduce((sum, acc) => {
+                const aQty = Number(assignForm.watch(`qty_${acc.id}`) || 0)
+                const included = assignForm.watch(`inc_${acc.id}`) || false
+                return sum + (included ? acc.price * aQty : 0)
+              }, 0)
+              const subtotal = unitPrice * qty + accTotal
+              const vat = computeVat(subtotal, sale.vatRate ?? VAT_RATE)
+              const total = subtotal + vat
+              return accTotal > 0 ? (
+                <div className="mt-3 rounded-xl bg-primary-50 border border-primary/20 p-3 text-sm space-y-1">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Vehicle ({qty} × {formatCurrency(unitPrice)})</span>
+                    <span>{formatCurrency(unitPrice * qty)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Accessories (billed)</span>
+                    <span className="text-green-700 font-medium">{formatCurrency(accTotal)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-slate-800 border-t border-primary/20 pt-1">
+                    <span>Invoice Total (excl. VAT)</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                </div>
+              ) : null
+            })()}
+          </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" className="btn-outline" onClick={() => setAssignOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={assignForm.formState.isSubmitting}>{assignForm.formState.isSubmitting && <ButtonLoader />} Assign</button>
+            <button type="submit" className="btn-primary" disabled={assignForm.formState.isSubmitting}>
+              {assignForm.formState.isSubmitting && <ButtonLoader />} Assign Unit
+            </button>
           </div>
         </form>
       </Modal>

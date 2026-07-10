@@ -68,7 +68,7 @@ export const saleService = {
    * Assign a unit to the customer. Checks available stock and reserves it.
    * Moves the sale to "Unit Assigned".
    */
-  assignUnit: async (saleId, vehicleId) => {
+  assignUnit: async (saleId, vehicleId, extras = {}) => {
     const vehicle = await inventoryService.getById(vehicleId)
     if (!vehicle) throw new Error('Vehicle not found')
     // Get sale to find out how many units are purchased
@@ -79,8 +79,17 @@ export const saleService = {
     for (let i = 0; i < units; i++) {
       await inventoryService.reserveUnit(vehicleId, vehicle)
     }
-    
-    await updateById(PATH, saleId, { vehicleId, status: 'Unit Assigned', unitAssignedAt: Date.now() })
+
+    const update = {
+      vehicleId,
+      status: 'Unit Assigned',
+      unitAssignedAt: Date.now(),
+    }
+    if (extras.accessories) {
+      update.accessories = extras.accessories
+      update.accessoriesTotal = Number(extras.accessoriesTotal) || 0
+    }
+    await updateById(PATH, saleId, update)
   },
 
   /**
